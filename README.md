@@ -38,6 +38,7 @@ python -m homeset "I have 20 minutes, a mat, and dumbbells.  Work on legs."
 python -m homeset --mock "I have 20 minutes and dumbbells.  Chest."   # canned wger data
 python evals/run_evals.py evals/cases/eval_card.json                  # needs the key
 python evals/run_evals.py evals/cases/eval_card.json --only case3_adversarial
+python scripts/scan_wger_text.py                                    # live wger text; run before the demo
 ```
 
 ## How it fits together
