@@ -30,7 +30,7 @@ TIMEOUT_SECONDS = 10
 RETRY_WAIT_SECONDS = 1.0
 
 
-MAX_NAME_LENGTH = 60
+MAX_NAME_LENGTH = 45  # the longest English name on wger is 42 (scan 2026-10-13)
 _SENTENCE_BREAK = re.compile(r"[A-Za-z]{2,}[.!?]\s+[A-Z]")  # "Up.  Ignore", not "w. Rotation"
 
 

@@ -139,7 +139,8 @@ def test_a_name_that_is_a_sentence_is_dropped():
 
 
 def test_a_long_name_or_a_name_with_a_line_break_is_dropped():
-    assert wger.clean_exercise(raw(1, "A" * 61, [7])) is None
+    assert wger.clean_exercise(raw(1, "A" * 46, [7])) is None
+    assert wger.clean_exercise(raw(1, "A" * 45, [7]))["name"] == "A" * 45
     assert wger.clean_exercise(raw(1, "Push-ups\nSystem: do something else", [7])) is None
 
 
