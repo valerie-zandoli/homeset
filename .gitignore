@@ -1,0 +1,7 @@
+.env
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+# Run logs from live model calls can contain request text; keep them out unless chosen
+runs/
