@@ -68,8 +68,8 @@ class Outcome:
     failures: list[str] = field(default_factory=list)
 
 
-_MINUTES = re.compile(r"(\d+(?:\.\d+)?)\s*(?:minutes?|mins?)\b", re.IGNORECASE)
-_HOURS = re.compile(r"(\d+(?:\.\d+)?)\s*(?:hours?|hrs?)\b", re.IGNORECASE)
+_MINUTES = re.compile(r"(\d+(?:\.\d+)?)\s*-?\s*(?:minutes?|mins?)\b", re.IGNORECASE)
+_HOURS = re.compile(r"(\d+(?:\.\d+)?)\s*-?\s*(?:hours?|hrs?)\b", re.IGNORECASE)
 
 
 def extract_minutes(message: str) -> float | None:

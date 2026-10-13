@@ -28,6 +28,8 @@ def test_extract_minutes():
     assert extract_minutes("I have an hour") == 60
     assert extract_minutes("half an hour on the mat") == 30
     assert extract_minutes("1.5 hours") == 90
+    assert extract_minutes("Give me a 20-minute workout") == 20  # found by the draft test requests
+    assert extract_minutes("a 1-hour session") == 60
     assert extract_minutes("work on legs") is None
 
 
