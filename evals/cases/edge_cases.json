@@ -6,7 +6,8 @@
       "input": "I have 20 minutes and a mat.  Chest.",
       "setup": "wger returns HTTP 500 twice.",
       "expect": {
-        "kind": "error"
+        "kind": "error",
+        "starts_with": "I could not reach the exercise database"
       },
       "inject": "wger_unavailable"
     },
@@ -15,7 +16,8 @@
       "input": "I have 20 minutes and a mat.  Chest.",
       "setup": "wger does not answer within 10 seconds, twice.",
       "expect": {
-        "kind": "error"
+        "kind": "error",
+        "starts_with": "I could not reach the exercise database"
       },
       "inject": "wger_unavailable"
     },
@@ -24,8 +26,9 @@
       "input": "I have 20 minutes and a pull-up bar.  Calves.",
       "setup": "The filters return no exercises.",
       "expect": {
-        "kind": "error",
-        "notes": "Say which filter was too narrow and suggest loosening it; no plan."
+        "kind": "question",
+        "notes": "Say which filter was too narrow and suggest loosening it; no plan.",
+        "starts_with": "I could not find any exercises for"
       },
       "inject": "empty_result"
     },
@@ -34,7 +37,8 @@
       "input": "I want a 2-minute full-body workout.",
       "expect": {
         "kind": "question",
-        "notes": "Say it does not fit and offer a realistic alternative; no invented plan."
+        "notes": "Say it does not fit and offer a realistic alternative; no invented plan.",
+        "starts_with": "I plan workouts of 10 to 45 minutes"
       }
     },
     {
@@ -42,7 +46,8 @@
       "input": "A mat and dumbbells.  Work on legs.",
       "expect": {
         "kind": "question",
-        "notes": "One short question about the minutes; stop."
+        "notes": "One short question about the minutes; stop.",
+        "starts_with": "How many minutes do you have"
       }
     }
   ]
