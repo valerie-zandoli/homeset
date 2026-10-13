@@ -1,0 +1,49 @@
+{
+  "description": "Set B:  5 edge cases (PRD 3d).  Target:  5 of 5 handled without a crash or a guess.",
+  "cases": [
+    {
+      "id": "b1_api_error",
+      "input": "I have 20 minutes and a mat.  Chest.",
+      "setup": "wger returns HTTP 500 twice.",
+      "expect": {
+        "kind": "error"
+      },
+      "inject": "wger_unavailable"
+    },
+    {
+      "id": "b2_api_timeout",
+      "input": "I have 20 minutes and a mat.  Chest.",
+      "setup": "wger does not answer within 10 seconds, twice.",
+      "expect": {
+        "kind": "error"
+      },
+      "inject": "wger_unavailable"
+    },
+    {
+      "id": "b3_empty_result",
+      "input": "I have 20 minutes and a pull-up bar.  Calves.",
+      "setup": "The filters return no exercises.",
+      "expect": {
+        "kind": "error",
+        "notes": "Say which filter was too narrow and suggest loosening it; no plan."
+      },
+      "inject": "empty_result"
+    },
+    {
+      "id": "b4_impossible_request",
+      "input": "I want a 2-minute full-body workout.",
+      "expect": {
+        "kind": "question",
+        "notes": "Say it does not fit and offer a realistic alternative; no invented plan."
+      }
+    },
+    {
+      "id": "b5_missing_time",
+      "input": "A mat and dumbbells.  Work on legs.",
+      "expect": {
+        "kind": "question",
+        "notes": "One short question about the minutes; stop."
+      }
+    }
+  ]
+}

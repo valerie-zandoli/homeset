@@ -1,0 +1,12 @@
+{
+  "owner": "Valerie",
+  "description": "Set A:  20 realistic plan requests.  Target:  18 of 20 pass every check, each within 5 minutes of the time asked.  Write the expected checks before the first run.",
+  "suggested_coverage": [
+    "10 to 45 minutes",
+    "no equipment, a mat, dumbbells, a band, mixed",
+    "every focus label at least once",
+    "a request with no focus (full body, marked assumed)",
+    "a request with no equipment (none, marked assumed)"
+  ],
+  "cases": []
+}
