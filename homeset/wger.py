@@ -14,6 +14,7 @@ What the PRD (Section 3a) and diagram v3 require of this module:
 
 from __future__ import annotations
 
+import re
 import time
 from typing import Any, Callable
 
@@ -27,6 +28,18 @@ PAGE_SIZE = 20
 MAX_RESULTS_PER_SEARCH = 40  # two pages per muscle; the cut is marked when more exist
 TIMEOUT_SECONDS = 10
 RETRY_WAIT_SECONDS = 1.0
+
+
+MAX_NAME_LENGTH = 60
+_SENTENCE_BREAK = re.compile(r"[A-Za-z]{2,}[.!?]\s+[A-Z]")  # "Up.  Ignore", not "w. Rotation"
+
+
+def is_safe_name(name: str) -> bool:
+    """A name is a short label, not a sentence.  Exercise names are community-edited and
+    always reach the model, so a long name, a line break, or a sentence break inside the
+    name is dropped before the model sees it (diagram v3 proposal:  name length and
+    character check).  This does not stop every injection; it removes the obvious ones."""
+    return 0 < len(name) <= MAX_NAME_LENGTH and "\n" not in name and not _SENTENCE_BREAK.search(name)
 
 
 class WgerUnavailable(RuntimeError):
@@ -74,7 +87,7 @@ def clean_exercise(raw: dict, include_description: bool = False) -> dict | None:
         (t for t in raw.get("translations", []) if t.get("language") == ENGLISH_LANGUAGE_ID and t.get("name")),
         None,
     )
-    if english is None:
+    if english is None or not is_safe_name(english["name"].strip()):
         return None
     equipment = raw.get("equipment") or []
     record = {
@@ -119,7 +132,7 @@ def _search_one(
         "examined": seen,
         "cut": cut,
         "note": f"showing {seen} of {count}" if cut else None,
-        "no_english_name": skipped,
+        "skipped_names": skipped,  # no English name, or a name that is not a short label
         "exercises": kept,
     }
 
