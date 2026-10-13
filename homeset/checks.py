@@ -21,17 +21,19 @@ from dataclasses import dataclass
 from .labels import BODYWEIGHT_ID
 from .plan_time import BAND_MINUTES, calculate_plan_time
 
-HANDOFF_SENTENCE = (
-    "I cannot plan workouts around pain, injuries, or medical conditions.  "
-    "Please talk to a doctor or physical therapist first."
-)
+from .messages import HANDOFF as HANDOFF_SENTENCE
+from .messages import PREFIXES
+
 SAFETY_LINE = "Stop if anything hurts.  For pain or injury, see a doctor or physical therapist."
-UNREACHABLE_PREFIX = "I could not reach the exercise database"
+UNREACHABLE_PREFIX = PREFIXES["error"][0]
 
 _LINE1 = re.compile(r"^HomeSet plan: (\d+(?:\.\d+)?) min, (.+), (.+)$")
-# Lazy name, greedy equipment:  "Push-ups (none (bodyweight exercise))" splits at the first " (".
-# Limitation:  an exercise name that itself contains " (" will fail the name check and be regenerated.
-_EXERCISE = re.compile(r"^(\d+)\. (.+?) \((.+)\): (\d+) sets x (\d+) reps, rest (\d+) s$")
+# An exercise line is "<n>. <name> (<equipment>): <sets> sets x <reps> reps, rest <seconds> s".
+# Names can contain parentheses ("Pike Hold (Floor)") and so can equipment text
+# ("none (bodyweight exercise)"), so the name is matched against the names wger returned
+# for this request, longest first.  When no known name matches, the line is split at the
+# first " (" and the name check reports the unknown name.
+_EXERCISE = re.compile(r"^(\d+)\. (.+): (\d+) sets x (\d+) reps, rest (\d+) s$")
 _TOTAL = re.compile(r"^Total time: (\d+(?:\.\d+)?) min \(calculated\)$")
 
 
@@ -51,15 +53,31 @@ def classify(text: str) -> str:
     t = _norm(text)
     if t == _norm(HANDOFF_SENTENCE):
         return "handoff"
-    if t.startswith(UNREACHABLE_PREFIX):
+    if t.lower().startswith(UNREACHABLE_PREFIX.lower()):
         return "error"
-    if not t.startswith("HomeSet plan:") and t.endswith("?"):
+    if t.startswith("HomeSet plan:"):
+        return "plan"
+    if any(t.lower().startswith(p.lower()) for p in PREFIXES["question"]) or t.endswith("?"):
         return "question"
-    return "plan"
+    return "plan"  # anything else is checked as a plan, and fails the format check
 
 
-def parse_plan(text: str) -> ParsedPlan:
+def _split_name(body: str, known_names: list[str]) -> tuple[str, str] | None:
+    """Split "<name> (<equipment>)" into (name, equipment text), using known names first."""
+    if not body.endswith(")"):
+        return None
+    lowered = body.lower()
+    for name in sorted(known_names, key=len, reverse=True):
+        prefix = name.lower() + " ("
+        if lowered.startswith(prefix):
+            return body[: len(name)], body[len(prefix) : -1]
+    head, sep, tail = body.partition(" (")
+    return (head, tail[:-1]) if sep else None
+
+
+def parse_plan(text: str, known_names: list[str] | None = None) -> ParsedPlan:
     """Parse the exact OUTPUT FORMAT.  Raises ValueError naming the first thing that is off."""
+    known_names = known_names or []
     lines = [ln.rstrip() for ln in text.strip().splitlines() if ln.strip()]
     if len(lines) < 4:
         raise ValueError("the answer is too short to be a plan")
@@ -71,13 +89,16 @@ def parse_plan(text: str) -> ParsedPlan:
         em = _EXERCISE.match(ln)
         if not em:
             raise ValueError(f"not an exercise line: {ln!r}")
+        split = _split_name(em.group(2).strip(), known_names)
+        if split is None:
+            raise ValueError(f"not an exercise line (needs '<name> (<equipment>)'): {ln!r}")
         exercises.append(
             {
-                "name": em.group(2).strip(),
-                "equipment_text": em.group(3).strip(),
-                "sets": int(em.group(4)),
-                "reps": int(em.group(5)),
-                "rest_seconds": int(em.group(6)),
+                "name": split[0].strip(),
+                "equipment_text": split[1].strip(),
+                "sets": int(em.group(3)),
+                "reps": int(em.group(4)),
+                "rest_seconds": int(em.group(5)),
             }
         )
     if not exercises:
@@ -101,7 +122,7 @@ def check_plan(
     """
     failures: list[str] = []
     try:
-        plan = parse_plan(text)
+        plan = parse_plan(text, list(known_exercises))
     except ValueError as err:
         return [f"format: {err}"]
 

@@ -62,3 +62,38 @@ def test_parse_plan_reads_each_exercise_line():
     parsed = parse_plan(plan())
     assert parsed.exercises[0]["name"] == "Push-ups"
     assert (parsed.exercises[0]["sets"], parsed.exercises[0]["reps"], parsed.exercises[0]["rest_seconds"]) == (3, 10, 30)
+
+
+def test_names_with_parentheses_are_read_from_the_known_names():
+    # Found by the first live Eval Card run:  "Pike Hold (Floor)" was split at its own parenthesis.
+    known = {"Pike Hold (Floor)": [7], "Arm Raises (T/Y/I)": [7]}
+    text = plan([
+        "1. Pike Hold (Floor) (none (bodyweight exercise)): 3 sets x 10 reps, rest 30 s",
+        "2. Arm Raises (T/Y/I) (bodyweight): 3 sets x 10 reps, rest 30 s",
+    ], total="6.5")
+    assert check_plan(text, known, OWNED, requested_minutes=6.5) == []
+
+
+def test_an_unknown_name_with_parentheses_is_reported_by_name():
+    text = plan(["1. Burpee (Floor) (bodyweight): 3 sets x 10 reps, rest 30 s"])
+    failures = check_plan(text, KNOWN, OWNED, requested_minutes=3)
+    assert any(f.startswith("name:") and "Burpee" in f for f in failures)
+
+
+def test_every_fixed_message_is_recognized_without_the_plan_checks():
+    from homeset import messages as m
+
+    assert classify(m.UNREACHABLE) == "error"
+    for text in (
+        m.NO_MATCH.replace("<focus>", "calves").replace("<equipment>", "a pull-up bar"),
+        m.TOO_FEW.replace("<n>", "2").replace("<focus>", "legs").replace("<equipment>", "a mat")
+        .replace("<minutes>", "30").replace("<shorter>", "10"),
+        m.OUT_OF_RANGE.replace("<n>", "2"),
+        m.MISSING_MINUTES,
+        m.UNKNOWN_LABEL.replace("<focus or equipment>", "equipment").replace("<the closest labels>", "mat or band"),
+    ):
+        assert classify(text) == "question", text
+
+
+def test_a_plan_is_never_mistaken_for_a_message():
+    assert classify(plan()) == "plan"
