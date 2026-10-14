@@ -22,7 +22,7 @@ HomeSet is a single-role AI agent built by Valerie Zandoli and Yadan Taino for P
 | System prompt v0 (`homeset/prompt.py`) | Copied from PRD 3b |
 | Model wiring (`homeset/agent.py`) | **Run live 2026-10-13** with a personal Pursuit-issued key:  Eval Card 6 of 6, edge cases 5 of 5, controls 5 of 5 matched the expected kind.  The notes (counts, ranges) are not yet graded by two people. |
 | Eval runner (`evals/run_evals.py`) | Works live; checks kind, opening wording, and banned words; saves runs to `runs/` (git-ignored) |
-| Eval cases | Written: card, edge cases, controls, multi-turn, injection, and regression.  The last three ran live 2026-10-14 and all matched the expected kind (notes not yet graded by two people).  Still open: the 20-request set and the refusal set; see Open items 2 and 8. |
+| Eval cases | Written: card, edge cases, controls, multi-turn, injection, and regression.  The last three ran live 2026-10-14 and all matched the expected kind (notes not yet graded by two people).  The 20-request set (`requests_20.json`) was reviewed and approved by Valerie on 2026-10-14 and has not run yet.  The refusal set is still open; see Open item 2. |
 
 ## Set up
 
@@ -77,4 +77,3 @@ From the PRD and the diagram:
 5. **Fixed wording for the no-plan messages.**  Drafted in `docs/fixed-messages.md` and already used by the code and prompt; **PRD Section 3b still has the looser v0 wording**.  Agree it, then update the Google Doc.  Includes a 10 to 45 minute range.
 6. **Blue items in diagram v3 (proposed, not in the PRD).**  This repo already keeps only English name, equipment, muscles, and category (descriptions are dropped; `include_description=True` brings them back), drops exercises that need gear the user lacks, marks the cut, and drops exercise names that are sentences or longer than 45 characters (an injection filter).  Confirm or remove.
 7. **Visible-error wording.**  `ERROR_MESSAGE` and `BUDGET_MESSAGE` in `harness.py` are placeholders.
-8. **Request set A (Valerie).**  `evals/cases/requests_20.json` is a draft of 20 realistic plan requests, written 2026-10-13.  Valerie reviews and edits it before any model run, and nobody changes an expectation after seeing an answer.  Target:  18 of 20 pass every check, each within 5 minutes of the time asked.  Not yet run.
