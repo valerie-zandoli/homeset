@@ -18,7 +18,7 @@ HomeSet turns one sentence, such as "I have 20 minutes, a mat, and dumbbells.  W
 | System prompt v0 (`homeset/prompt.py`) | Copied from PRD 3b |
 | Model wiring (`homeset/agent.py`) | **Run live 2026-10-13** with a personal Pursuit-issued key:  Eval Card 6 of 6, edge cases 5 of 5, controls 5 of 5 matched the expected kind.  The notes (counts, ranges) are not yet graded by two people. |
 | Eval runner (`evals/run_evals.py`) | Works live; checks kind, opening wording, and banned words; saves runs to `runs/` (git-ignored) |
-| Eval cases | Card, edge cases, controls, multi-turn, injection, and regression cases written; the last three ran live 2026-10-14 and all matched the expected kind (notes not yet graded by two people).  `requests_20.json` is a **draft for Valerie to review before any run**.  **Yadan writes `refusals_5.json`.** |
+| Eval cases | Written: card, edge cases, controls, multi-turn, injection, and regression.  The last three ran live 2026-10-14 and all matched the expected kind (notes not yet graded by two people).  Still open: the 20-request set and the refusal set; see Open items 2 and 8. |
 
 ## Set up
 
@@ -67,9 +67,10 @@ user message -> model + system prompt -> tool runner -> wger
 From the PRD and the diagram:
 
 1. **Soleus under legs.**  Yadan said to include Soleus (15) "with calves".  `legs` currently includes it (five muscles, exactly the five-search cap).  Confirm.
-2. **Refusal cases.**  Pregnancy and surgery are hand-off triggers; the five refusal cases should cover them.
+2. **Refusal cases (Yadan).**  Yadan writes `evals/cases/refusals_5.json`.  Pregnancy and surgery are hand-off triggers; the five cases should cover them.
 3. **Survey.**  Not run.  The counts go into PRD Section 1.
 4. **Time model.**  3 seconds per rep, the rest given after every set, 30 seconds between exercises.  Still an assumption:  no workout has been timed with a stopwatch, so the constants are unchanged.  On 2026-10-14 the prompt (step 7) was changed to aim within 2 minutes (`AIM_MINUTES`) while the pass band stays 5; across 13 live plans every total landed within 1.1 minutes of the request (before:  21 plans from -3.0 to +4.8).  PRD 3b step 7 was updated to match on 2026-10-14 (Yadan to confirm).  Open question for a stopwatch trial:  counting a rest after the last set of an exercise on top of the 30-second transition may over-count (about 1 minute per exercise at 60 seconds of rest).  Timed moves such as planks are version 2.
 5. **Fixed wording for the no-plan messages.**  Drafted in `docs/fixed-messages.md` and already used by the code and prompt; **PRD Section 3b still has the looser v0 wording**.  Agree it, then update the Google Doc.  Includes a 10 to 45 minute range.
 6. **Blue items in diagram v3 (proposed, not in the PRD).**  This repo already keeps only English name, equipment, muscles, and category (descriptions are dropped; `include_description=True` brings them back), drops exercises that need gear the user lacks, marks the cut, and drops exercise names that are sentences or longer than 45 characters (an injection filter).  Confirm or remove.
 7. **Visible-error wording.**  `ERROR_MESSAGE` and `BUDGET_MESSAGE` in `harness.py` are placeholders.
+8. **Request set A (Valerie).**  `evals/cases/requests_20.json` is a draft of 20 realistic plan requests, written 2026-10-13.  Valerie reviews and edits it before any model run, and nobody changes an expectation after seeing an answer.  Target:  18 of 20 pass every check, each within 5 minutes of the time asked.  Not yet run.
