@@ -74,3 +74,19 @@ def run_once(user_message: str, search_fn=None) -> Outcome:
     state = RequestState(user_message=user_message)
     agent = build_agent(state, search_fn)
     return handle_request(user_message, lambda text: str(agent(text)), state)
+
+
+def run_conversation(turns: list[str], search_fn=None, agent_factory=build_agent) -> list[Outcome]:
+    """One conversation with several user messages and one model history (multi-turn evals).
+
+    The model keeps the whole conversation; the harness treats each message as its own
+    request, so the 10-call cap and the output checks restart every turn.  `agent_factory`
+    exists so tests can pass a scripted agent that needs no key.
+    """
+    state = RequestState(user_message=turns[0])
+    agent = agent_factory(state, search_fn)
+    outcomes = []
+    for turn in turns:
+        state.reset_for(turn)
+        outcomes.append(handle_request(turn, lambda text: str(agent(text)), state))
+    return outcomes

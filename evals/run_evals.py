@@ -4,7 +4,9 @@
     python evals/run_evals.py evals/cases/eval_card.json --mock
 
 A case passes here when the outcome KIND matches expect.kind ('plan', 'handoff',
-'question', or 'error') and, when expect.starts_with is set, the message opens with that wording.  For plans the output checks have already run inside the
+'question', or 'error') and, when expect.starts_with is set, the message opens with that wording.
+A case with a "turns" list is one conversation:  each turn has its own input and expect, the
+model keeps the history, and the case passes only when every turn passes.  For plans the output checks have already run inside the
 harness.  The NOTES in each case (counts, ranges, exact wording) are graded by two people
 reading the saved run, the same way each time (PRD 3d).
 
@@ -22,7 +24,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from homeset.agent import run_once  # noqa: E402
+from homeset.agent import run_conversation, run_once  # noqa: E402
 from homeset.mock_wger import mock_get, mock_search  # noqa: E402
 from homeset.wger import WgerUnavailable, _default_get as wger_default_get, search_exercises  # noqa: E402
 
@@ -64,6 +66,18 @@ def search_for(case: dict, mock: bool):
     return mock_search if mock else search_exercises
 
 
+def meets(outcome, expect: dict) -> bool:
+    """True when the outcome has the expected kind, none of the banned words, and the fixed opening."""
+    ok = outcome.kind == expect["kind"]
+    for banned in expect.get("must_not_contain", []):
+        if banned.lower() in outcome.text.lower():
+            ok = False  # injected words reached the user
+    opening = expect.get("starts_with")
+    if opening and " ".join(outcome.text.split()).lower().startswith(opening.lower()) is False:
+        ok = False  # the message must open with the fixed wording
+    return ok
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("cases_file")
@@ -80,14 +94,22 @@ def main() -> int:
         return 1
     rows, passed = [], 0
     for case in cases:
-        outcome = run_once(case["input"], search_for(case, args.mock))
-        ok = outcome.kind == case["expect"]["kind"]
-        for banned in case["expect"].get("must_not_contain", []):
-            if banned.lower() in outcome.text.lower():
-                ok = False  # injected words reached the user
-        opening = case["expect"].get("starts_with")
-        if opening and " ".join(outcome.text.split()).lower().startswith(opening.lower()) is False:
-            ok = False  # the message must open with the fixed wording
+        search = search_for(case, args.mock)
+        if "turns" in case:
+            turns = case["turns"]
+            outcomes = run_conversation([t["input"] for t in turns], search)
+            checks = [meets(o, t["expect"]) for o, t in zip(outcomes, turns)]
+            ok = all(checks)
+            passed += ok
+            rows.append({"id": case["id"], "turns": [
+                {"expected_kind": t["expect"]["kind"], "kind": o.kind, "pass": c, "failures": o.failures, "text": o.text}
+                for o, t, c in zip(outcomes, turns, checks)]})
+            got = ",".join(o.kind for o in outcomes)
+            want = ",".join(t["expect"]["kind"] for t in turns)
+            print(f"{'PASS' if ok else 'FAIL'}  {case['id']}  expected={want}  got={got}")
+            continue
+        outcome = run_once(case["input"], search)
+        ok = meets(outcome, case["expect"])
         passed += ok
         rows.append({"id": case["id"], "expected_kind": case["expect"]["kind"], "kind": outcome.kind, "pass": ok,
                      "failures": outcome.failures, "text": outcome.text})

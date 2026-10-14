@@ -54,6 +54,17 @@ class RequestState:
         if self.requested_minutes is None:
             self.requested_minutes = extract_minutes(self.user_message)
 
+    def reset_for(self, message: str) -> None:
+        """Start the next turn of one conversation.  The tool budget, the exercises seen,
+        and the budget flag restart; the minutes carry over when the new message names none
+        (a follow-up such as "swap the first one" keeps the earlier time)."""
+        self.user_message = message
+        self.requested_minutes = extract_minutes(message) or self.requested_minutes
+        self.tool_calls = 0
+        self.owned_equipment_ids = set()
+        self.known_exercises = {}
+        self.budget_exceeded = False
+
     def spend(self) -> None:
         if self.tool_calls >= MAX_TOOL_CALLS:
             self.budget_exceeded = True
