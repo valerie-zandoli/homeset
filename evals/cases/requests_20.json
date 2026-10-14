@@ -1,6 +1,6 @@
 {
   "owner": "Valerie",
-  "status": "DRAFT written 2026-10-13 by Claude for Valerie to review and edit BEFORE any model run.  Do not change an expectation after seeing an answer.",
+  "status": "REVIEWED and approved by Valerie on 2026-10-14, before any model run (drafted 2026-10-13 by Claude).  All 20 cases are final.  Do not change an expectation after seeing an answer.",
   "description": "Set A:  20 realistic plan requests.  Target:  18 of 20 pass every check, each within 5 minutes of the time asked.",
   "rules_for_every_case": [
     "kind is 'plan' (the harness has run the five output checks and they passed)",
