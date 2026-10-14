@@ -6,7 +6,7 @@ HomeSet turns one sentence, such as "I have 20 minutes, a mat, and dumbbells.  W
 - **Design:**  `docs/architecture-v3.png` (detailed) and `docs/architecture-v1.png` (simple)
 - **Data:**  the free [wger](https://wger.de/en/software/api) exercise database (read-only)
 
-## Status (2026-10-13, end of day)
+## Status (2026-10-14)
 
 | Part | State |
 |---|---|
