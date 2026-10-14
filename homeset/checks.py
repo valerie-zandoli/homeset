@@ -35,6 +35,10 @@ _LINE1 = re.compile(r"^HomeSet plan: (\d+(?:\.\d+)?) min, (.+), (.+)$")
 # first " (" and the name check reports the unknown name.
 _EXERCISE = re.compile(r"^(\d+)\. (.+): (\d+) sets x (\d+) reps, rest (\d+) s$")
 _TOTAL = re.compile(r"^Total time: (\d+(?:\.\d+)?) min \(calculated\)$")
+# Any one of these on a line of its own marks a reply as a plan, even with other text around it.
+_PLAN_MARKERS = re.compile(
+    r"^\s*(?:HomeSet plan:|\d+\. .+: \d+ sets x \d+ reps|Total time:)", re.MULTILINE
+)
 
 
 def _norm(text: str) -> str:
@@ -49,14 +53,19 @@ class ParsedPlan:
 
 
 def classify(text: str) -> str:
-    """'handoff', 'error', 'question', or 'plan' (anything else is checked as a plan)."""
+    """'handoff', 'error', 'question', or 'plan' (anything else is checked as a plan).
+
+    A reply that carries any plan marker is a plan, whatever else it says.  Otherwise a
+    preamble, a plan, and a closing question mark would count as a question and skip every
+    output check.  Only the exact hand-off sentence takes the direct path before this test.
+    """
     t = _norm(text)
     if t == _norm(HANDOFF_SENTENCE):
         return "handoff"
+    if _PLAN_MARKERS.search(text):
+        return "plan"
     if t.lower().startswith(UNREACHABLE_PREFIX.lower()):
         return "error"
-    if t.startswith("HomeSet plan:"):
-        return "plan"
     if any(t.lower().startswith(p.lower()) for p in PREFIXES["question"]) or t.endswith("?"):
         return "question"
     return "plan"  # anything else is checked as a plan, and fails the format check

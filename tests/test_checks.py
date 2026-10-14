@@ -97,3 +97,35 @@ def test_every_fixed_message_is_recognized_without_the_plan_checks():
 
 def test_a_plan_is_never_mistaken_for_a_message():
     assert classify(plan()) == "plan"
+
+
+# The direct path must not be reachable by a reply that carries a plan.  Found 2026-10-14 by
+# calling classify() on a preamble, a plan, and a closing question mark (README retro note).
+def test_a_plan_with_a_closing_question_mark_is_still_a_plan():
+    text = "Sure, here is your workout.\n" + plan() + "\nShall I make it harder?"
+    assert classify(text) == "plan"
+
+
+def test_a_preamble_before_a_plan_is_a_plan():
+    assert classify("Sure, here is your workout.\n" + plan()) == "plan"
+
+
+def test_a_reply_with_exercise_lines_or_a_total_is_a_plan_even_without_line_1():
+    lines = "1. Push-ups (none (bodyweight exercise)): 3 sets x 10 reps, rest 30 s\nWould you like another?"
+    assert classify(lines) == "plan"
+    assert classify("Here you go.\nTotal time: 3.0 min (calculated)\nAnything else?") == "plan"
+
+
+def test_an_unreachable_message_followed_by_a_plan_is_checked_as_a_plan():
+    text = "I could not reach the exercise database.\n" + plan()
+    assert classify(text) == "plan"
+
+
+def test_a_question_that_lists_labels_is_still_a_question():
+    text = "I am not sure which focus you mean.  Which of these fits best:\n1. legs\n2. thighs\nWhich one?"
+    assert classify(text) == "question"
+
+
+def test_the_exact_handoff_sentence_is_still_a_handoff():
+    assert classify(HANDOFF_SENTENCE) == "handoff"
+    assert classify(HANDOFF_SENTENCE + "\n" + plan()) == "plan"

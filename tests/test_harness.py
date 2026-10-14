@@ -109,3 +109,22 @@ def test_unknown_label_and_wger_failure_come_back_as_tool_errors_not_crashes():
     search_tool, _ = make_tools(state, broken)
     reply = json.loads(search_tool("chest", []))
     assert reply["error"] == "wger_unavailable" and "I could not reach the exercise database" in reply["message"]
+
+
+def test_a_plan_wrapped_in_a_question_is_checked_not_waved_through():
+    # Before 2026-10-14 this reply was classed as a question and skipped every check, so an
+    # exercise that never came back from wger and a missing safety line reached the user.
+    reply = "\n".join(
+        [
+            "Sure, here is your workout.",
+            "HomeSet plan: 3 min, dumbbells, chest",
+            "1. Invented Move (item 3): 3 sets x 10 reps, rest 30 s",
+            "Total time: 3.0 min (calculated)",
+            "Shall I make it harder?",
+        ]
+    )
+    state = RequestState("I have 3 minutes and dumbbells.  Chest.")
+    prime(state)
+    outcome = handle_request(state.user_message, lambda text: reply, state)
+    assert outcome.kind == "error" and outcome.text == ERROR_MESSAGE
+    assert outcome.failures  # the checks ran and said why
