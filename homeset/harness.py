@@ -52,6 +52,7 @@ class RequestState:
     known_exercises: dict[str, list[int]] = field(default_factory=dict)  # name -> equipment ids
     budget_exceeded: bool = False
     conversation_text: str = ""  # every user message so far; the "(assumed)" marker reads it
+    tool_errors: list[str] = field(default_factory=list)  # fixed-wording reasons, for the run log
 
     def __post_init__(self) -> None:
         if self.requested_minutes is None:
@@ -71,6 +72,7 @@ class RequestState:
         self.owned_equipment_ids = set()
         self.known_exercises = {}
         self.budget_exceeded = False
+        self.tool_errors = []
 
     def spend(self) -> None:
         if self.tool_calls >= MAX_TOOL_CALLS:
@@ -85,6 +87,7 @@ class Outcome:
     text: str
     failures: list[str] = field(default_factory=list)
     reason: str = ""  # for a hand-off fired by code:  the trigger word that fired
+    tool_errors: list[str] = field(default_factory=list)  # why a tool failed, whatever the model then wrote
 
 
 _MINUTES = re.compile(r"(\d+(?:\.\d+)?)\s*-?\s*(?:minutes?|mins?)\b", re.IGNORECASE)
@@ -115,12 +118,15 @@ def make_tools(state: RequestState, search_fn: Callable = search_exercises):
         try:
             state.spend()
         except ToolBudgetExceeded as err:
+            state.tool_errors.append("tool_call_limit")
             return json.dumps({"error": "tool_call_limit", "message": str(err)})
         try:
             result = search_fn(focus, equipment)
         except UnknownLabel as err:
+            state.tool_errors.append("unknown_label")
             return json.dumps({"error": "unknown_label", "message": str(err)})
         except WgerUnavailable as err:
+            state.tool_errors.append(f"wger_unavailable: {err}")  # fixed wording, never response text
             return json.dumps({"error": "wger_unavailable", "message": f"I could not reach the exercise database ({err})"})
         state.owned_equipment_ids.update(result["equipment_ids"])
         for group in result["groups"]:
@@ -132,10 +138,12 @@ def make_tools(state: RequestState, search_fn: Callable = search_exercises):
         try:
             state.spend()
         except ToolBudgetExceeded as err:
+            state.tool_errors.append("tool_call_limit")
             return json.dumps({"error": "tool_call_limit", "message": str(err)})
         try:
             return json.dumps({"total_minutes": calculate_plan_time(exercises)})
         except ValueError as err:
+            state.tool_errors.append("bad_input")
             return json.dumps({"error": "bad_input", "message": str(err)})
 
     return search_exercises_tool, calculate_plan_time_tool
@@ -157,7 +165,16 @@ def handle_request(user_message: str, ask_model: Callable[[str], str], state: Re
     checked first, in code, over the whole conversation:  the exact hand-off sentence goes
     to the user and the model is never called.  The prompt's step 1 still handles the
     ambiguous cases and is the second layer behind this check.
+
+    Every outcome carries the reasons any tool failed during the request, so a saved run
+    shows why the user saw "could not reach" (HTTP 503, an unreadable response, a deadline).
     """
+    outcome = _run_request(user_message, ask_model, state)
+    outcome.tool_errors = list(state.tool_errors)
+    return outcome
+
+
+def _run_request(user_message: str, ask_model: Callable[[str], str], state: RequestState) -> Outcome:
     trigger = find_trigger(state.conversation_text or user_message)
     if trigger:
         return Outcome("handoff", HANDOFF_SENTENCE, reason=trigger)

@@ -128,3 +128,25 @@ def test_a_plan_wrapped_in_a_question_is_checked_not_waved_through():
     outcome = handle_request(state.user_message, lambda text: reply, state)
     assert outcome.kind == "error" and outcome.text == ERROR_MESSAGE
     assert outcome.failures  # the checks ran and said why
+
+
+def test_tool_failures_are_recorded_on_the_outcome_with_their_reason():
+    from homeset.messages import UNREACHABLE
+    from homeset.wger import WgerUnavailable
+
+    def broken(focus, equipment):
+        raise WgerUnavailable("HTTP 503")
+
+    state = RequestState("I have 20 minutes and dumbbells.  Chest.")
+    search_tool, _ = make_tools(state, broken)
+    search_tool("chest", ["dumbbells"])
+    outcome = handle_request(state.user_message, lambda text: UNREACHABLE, state)
+    assert outcome.kind == "error"
+    assert outcome.tool_errors == ["wger_unavailable: HTTP 503"]  # the user sees one sentence; the log keeps why
+
+
+def test_tool_errors_restart_with_each_turn_of_a_conversation():
+    state = RequestState("I have 20 minutes.")
+    state.tool_errors.append("unknown_label")
+    state.reset_for("I have 20 minutes and a mat.  Legs.")
+    assert state.tool_errors == []

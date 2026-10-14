@@ -123,7 +123,8 @@ def main() -> int:
             ok = all(checks)
             passed += ok
             rows.append({"id": case["id"], "turns": [
-                {"expected_kind": t["expect"]["kind"], "kind": o.kind, "pass": c, "failures": o.failures, "text": o.text}
+                {"expected_kind": t["expect"]["kind"], "kind": o.kind, "pass": c, "failures": o.failures,
+                 "tool_errors": o.tool_errors, "text": o.text}
                 for o, t, c in zip(outcomes, turns, checks)]})
             got = ",".join(o.kind for o in outcomes)
             want = ",".join(t["expect"]["kind"] for t in turns)
@@ -136,7 +137,7 @@ def main() -> int:
         ok = meets(outcome, case["expect"])
         passed += ok
         rows.append({"id": case["id"], "expected_kind": case["expect"]["kind"], "kind": outcome.kind, "pass": ok,
-                     "failures": outcome.failures, "text": outcome.text})
+                     "failures": outcome.failures, "tool_errors": outcome.tool_errors, "text": outcome.text})
         print(f"{'PASS' if ok else 'FAIL'}  {case['id']}  expected={case['expect']['kind']}  got={outcome.kind}")
     print(f"\n{passed} of {len(cases)} matched the expected kind.  Read the saved run to grade the notes.")
     out_dir = ROOT / "runs"
