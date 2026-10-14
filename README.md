@@ -28,7 +28,8 @@ HomeSet is a single-role AI agent built by Valerie Zandoli and Yadan Taino for P
 ## Set up
 
 ```bash
-cd ~/Desktop/Github-Projects/homeset
+git clone https://github.com/valerie-zandoli/homeset.git
+cd homeset
 python3.12 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements-dev.txt
