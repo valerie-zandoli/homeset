@@ -1,6 +1,10 @@
 # HomeSet
 
-HomeSet turns one sentence, such as "I have 20 minutes, a mat, and dumbbells.  Work on legs," into a numbered at-home workout plan.  It is a single-role AI agent built by Valerie Zandoli and Yadan Taino for Pursuit Cycle 2.
+HomeSet turns one sentence into a numbered at-home workout plan.
+
+Example:  "I have 20 minutes, a mat, and dumbbells.  Work on legs."
+
+HomeSet is a single-role AI agent built by Valerie Zandoli and Yadan Taino for Pursuit Cycle 2.
 
 - **Spec:**  [HomeSet Agent PRD](https://docs.google.com/document/d/1aQLT7d2mdhh-Bz-7_5RyaNbPUfcpwV9hcpnmFPKgIxQ/edit) (the Google Doc is the source of truth; this repo follows it)
 - **Design:**  `docs/architecture-v3.png` (detailed) and `docs/architecture-v1.png` (simple)
