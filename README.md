@@ -16,7 +16,7 @@ HomeSet turns one sentence, such as "I have 20 minutes, a mat, and dumbbells.  W
 | Output checks, plans only (`homeset/checks.py`) | Done, tested |
 | Harness: tool-call cap, regenerate once, direct path (`homeset/harness.py`) | Done, tested without a model |
 | System prompt v0 (`homeset/prompt.py`) | Copied from PRD 3b |
-| Model wiring (`homeset/agent.py`) | **Run live 2026-10-13** with the class key:  Eval Card 6 of 6, edge cases 5 of 5, controls 5 of 5 matched the expected kind.  The notes (counts, ranges) are not yet graded by two people. |
+| Model wiring (`homeset/agent.py`) | **Run live 2026-10-13** with a personal Pursuit-issued key:  Eval Card 6 of 6, edge cases 5 of 5, controls 5 of 5 matched the expected kind.  The notes (counts, ranges) are not yet graded by two people. |
 | Eval runner (`evals/run_evals.py`) | Works live; checks kind, opening wording, and banned words; saves runs to `runs/` (git-ignored) |
 | Eval cases | Card, edge cases, controls, multi-turn, injection, and regression cases written; the last three ran live 2026-10-14 and all matched the expected kind (notes not yet graded by two people).  `requests_20.json` is a **draft for Valerie to review before any run**.  **Yadan writes `refusals_5.json`.** |
 
@@ -27,7 +27,7 @@ cd ~/Desktop/Github-Projects/homeset
 python3.12 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements-dev.txt
-cp .env.example .env        # then put the class API key in .env
+cp .env.example .env        # then put your personal API key in .env
 ```
 
 ## Run
