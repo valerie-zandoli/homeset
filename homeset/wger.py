@@ -126,6 +126,8 @@ def _search_one(
             elif set(record["equipment_ids"]) <= set(owned_ids):  # drop gear the user lacks
                 kept.append(record)
         url = page.get("next")
+        if url and not url.startswith(BASE_URL):
+            url = None  # a next link must stay on wger; a response cannot send us elsewhere
     cut = count > seen
     return {
         "count": count,

@@ -95,8 +95,8 @@ def test_english_name_is_used_for_fixture_rows_with_other_languages_first():
 
 def test_a_cut_list_is_marked():
     pages = iter([
-        {"count": 104, "next": "https://wger.de/next", "results": [raw(i, f"Move {i}", [7]) for i in range(20)]},
-        {"count": 104, "next": "https://wger.de/next2", "results": [raw(i, f"Move {i}", [7]) for i in range(20, 40)]},
+        {"count": 104, "next": wger.BASE_URL + "?limit=20&offset=20", "results": [raw(i, f"Move {i}", [7]) for i in range(20)]},
+        {"count": 104, "next": wger.BASE_URL + "?limit=20&offset=40", "results": [raw(i, f"Move {i}", [7]) for i in range(20, 40)]},
     ])
     result = wger.search_exercises("chest", [], get=lambda u, p, t: Resp(payload=next(pages)), sleep=no_sleep)
     group = result["groups"][0]

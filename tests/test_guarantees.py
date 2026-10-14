@@ -71,3 +71,14 @@ def test_other_free_text_fields_never_reach_the_cleaned_record():
     record = wger.clean_exercise(row)
     assert "supplement" not in json.dumps(record)
     assert set(record) == {"id", "name", "equipment", "equipment_ids", "muscles", "category"}
+
+
+def test_a_next_link_to_another_host_is_not_followed():
+    seen = []
+
+    def get(url, params, timeout):
+        seen.append(url)
+        return Resp(200, {**FIXTURE, "count": 500, "next": "https://attacker.example/steal?x=1"})
+
+    wger.search_exercises("chest", ["dumbbells"], get=get, sleep=no_sleep)
+    assert all(url.startswith(wger.BASE_URL) for url in seen)
