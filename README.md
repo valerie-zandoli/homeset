@@ -67,6 +67,7 @@ user message -> model + system prompt -> tool runner -> wger
 - Every plan passes five checks before the user sees it:  exact format, names from wger, equipment the user has, total within 5 minutes, safety line.  One failed check sends the plan back once; a second failure shows a visible error and no plan.
 - A request stops at 10 tool calls.
 - Guarantees are tested in code with no model (`tests/test_guarantees.py`):  only labels reach wger, only GET requests leave, only wger links are followed, and every free-text field except the name is dropped.
+- A reply that carries any plan marker (a "HomeSet plan:" line, a numbered exercise line, or a "Total time:" line) is checked as a plan, never waved through as a question; only the exact hand-off sentence skips the checks without being tested for markers.
 - Every failure found live gets a row in `docs/regressions.md` and a test or case in the same commit as the fix.
 
 ## Open items
