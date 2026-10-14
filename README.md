@@ -16,7 +16,7 @@ HomeSet is a single-role AI agent built by Valerie Zandoli and Yadan Taino for P
 | Part | State |
 |---|---|
 | Label tables (`homeset/labels.py`) | Done, tested |
-| wger client with paging, retry, and the English-translation rule (`homeset/wger.py`) | Done, tested, smoke-tested against the live service |
+| wger client with paging, retry, and the English-translation rule (`homeset/wger.py`) | Done, tested, smoke-tested against the live service; name filter tightened 2026-10-14 (allowed characters, 8-word cap, instruction-word deny-list; 0 of 932 real names dropped) |
 | Time calculator (`homeset/plan_time.py`) | Done, tested; the time model is an assumption to tune |
 | Output checks, plans only (`homeset/checks.py`) | Done, tested |
 | Harness: tool-call cap, regenerate once, direct path (`homeset/harness.py`) | Done, tested without a model |
@@ -68,7 +68,7 @@ user message -> model + system prompt -> tool runner -> wger
 - Every plan passes five checks before the user sees it:  exact format, names from wger, equipment the user has, total within 5 minutes, safety line.  One failed check sends the plan back once; a second failure shows a visible error and no plan.
 - Clear safety words (pain, injury, surgery, pregnancy, a medical condition) are checked in code over the whole conversation before the model is called, and fire the exact hand-off sentence.  The prompt's step 1 stays as the second layer for ambiguous wording.  The word list is finite, so unusual phrasing still reaches the model.
 - A request stops at 10 tool calls.
-- Guarantees are tested in code with no model (`tests/test_guarantees.py`):  only labels reach wger, only GET requests leave, only wger links are followed, and every free-text field except the name is dropped.
+- Guarantees are tested in code with no model (`tests/test_guarantees.py`):  only labels reach wger, only GET requests leave, only wger links are followed, and every free-text field except the name is dropped; a name must also pass a character, length, and word filter, so a short injected instruction cannot pose as an exercise.
 - A reply that carries any plan marker (a "HomeSet plan:" line, a numbered exercise line, or a "Total time:" line) is checked as a plan, never waved through as a question; only the exact hand-off sentence skips the checks without being tested for markers.
 - Every failure found live gets a row in `docs/regressions.md` and a test or case in the same commit as the fix.
 
