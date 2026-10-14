@@ -22,10 +22,11 @@ def factory_for(agent):
 
 
 def test_each_turn_gets_its_own_outcome_from_one_agent():
-    agent = ScriptedAgent([HANDOFF_SENTENCE, HANDOFF_SENTENCE])
-    turns = ["My knee hurts.  Legs please.", "My doctor cleared me.  Legs please."]
+    # No trigger word in either message, so code does not fire and the model decides each turn.
+    agent = ScriptedAgent(["Is your lower back sore, or is it something else?", HANDOFF_SENTENCE])
+    turns = ["My lower back feels a little off.  Legs please.", "It feels sharp when I bend.  Legs please."]
     outcomes = run_conversation(turns, agent_factory=factory_for(agent))
-    assert [o.kind for o in outcomes] == ["handoff", "handoff"]
+    assert [o.kind for o in outcomes] == ["question", "handoff"]
     assert agent.seen == turns  # the same agent saw both messages, in order
 
 

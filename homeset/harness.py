@@ -23,7 +23,8 @@ from dataclasses import dataclass, field
 from typing import Callable
 
 from .assumed import mark_assumed
-from .checks import check_plan, classify
+from .checks import HANDOFF_SENTENCE, check_plan, classify
+from .triggers import find_trigger
 from .labels import UnknownLabel
 from .plan_time import calculate_plan_time
 from .wger import WgerUnavailable, search_exercises
@@ -83,6 +84,7 @@ class Outcome:
     kind: str  # 'plan' | 'handoff' | 'question' | 'error'
     text: str
     failures: list[str] = field(default_factory=list)
+    reason: str = ""  # for a hand-off fired by code:  the trigger word that fired
 
 
 _MINUTES = re.compile(r"(\d+(?:\.\d+)?)\s*-?\s*(?:minutes?|mins?)\b", re.IGNORECASE)
@@ -149,7 +151,16 @@ def _feedback(failures: list[str]) -> str:
 
 
 def handle_request(user_message: str, ask_model: Callable[[str], str], state: RequestState) -> Outcome:
-    """Run one request through the model, the output checks, and at most one regeneration."""
+    """Run one request through the model, the output checks, and at most one regeneration.
+
+    Clear safety triggers (pain, injury, surgery, pregnancy, a medical condition) are
+    checked first, in code, over the whole conversation:  the exact hand-off sentence goes
+    to the user and the model is never called.  The prompt's step 1 still handles the
+    ambiguous cases and is the second layer behind this check.
+    """
+    trigger = find_trigger(state.conversation_text or user_message)
+    if trigger:
+        return Outcome("handoff", HANDOFF_SENTENCE, reason=trigger)
     text = ask_model(user_message)
     for attempt in range(MAX_REGENERATIONS + 1):
         if state.budget_exceeded:
