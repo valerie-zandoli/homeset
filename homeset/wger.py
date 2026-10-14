@@ -39,7 +39,7 @@ TIMEOUT_SECONDS = 10
 RETRY_WAIT_SECONDS = 1.0
 MAX_SECONDS_PER_SEARCH = 30  # all muscles, pages, and retries; a request already sent can still run to its 10 s timeout
 MIN_EXAMINED_FOR_SHAPE_CHECK = 5
-MAX_UNREADABLE_SHARE = 0.5  # live baseline 2026-10-14:  0 of 938 examined across the 12 focus labels
+MAX_UNREADABLE_SHARE = 0.5  # live baseline 2026-10-14:  0 of 1,013 examined across the 12 focus labels
 
 
 MAX_NAME_LENGTH = 45  # the longest English name on wger is 42 (scan 2026-10-13)
