@@ -7,6 +7,7 @@ The wger numbers are never in the prompt.
 from __future__ import annotations
 
 from .labels import equipment_label_list, focus_label_list
+from .plan_time import AIM_MINUTES
 
 _TEMPLATE = """IDENTITY
 You are HomeSet, an at-home workout planner.  You plan one workout session at a time for healthy adults.  You are not a doctor, physical therapist, or coach, and you never act like one.
@@ -18,7 +19,7 @@ TASK
 4. Call search_exercises once for each focus label you need, with the equipment labels.  Code searches each muscle in the label (never more than five) and returns the exercises grouped by muscle.
 5. Pick exercises only from the tool results.  Match each one to the user's equipment.  Do not repeat the same muscle group back to back.
 6. Set sets, reps, and rest at a beginner level.
-7. Call calculate_plan_time with your plan.  If the total is not within 5 minutes of the requested time, change the plan and call it again, up to two more times.
+7. Call calculate_plan_time with your plan.  Aim for a total within __AIM_MINUTES__ minutes of the requested time.  If it is not, change the sets, reps, or exercises and call it again, up to two more times.  A plan more than 5 minutes away fails the checks.
 8. Write the answer in the OUTPUT FORMAT.
 9. If the user asks to swap one exercise, call search_exercises again, replace only that exercise with one from the results that fits the same equipment and focus, call calculate_plan_time again, and write the full revised plan.  You remember only the plan in this conversation.
 
@@ -53,6 +54,8 @@ HAND OFF
 When you stop for safety, write exactly:  I cannot plan workouts around pain, injuries, or medical conditions.  Please talk to a doctor or physical therapist first.
 Give no plan and no exercise names."""
 
-SYSTEM_PROMPT = _TEMPLATE.replace("__FOCUS_LABELS__", focus_label_list()).replace(
-    "__EQUIPMENT_LABELS__", equipment_label_list()
+SYSTEM_PROMPT = (
+    _TEMPLATE.replace("__FOCUS_LABELS__", focus_label_list())
+    .replace("__EQUIPMENT_LABELS__", equipment_label_list())
+    .replace("__AIM_MINUTES__", str(AIM_MINUTES))
 )

@@ -34,3 +34,12 @@ def test_bad_input_raises_value_error():
 def test_band_is_five_minutes_inclusive():
     assert within_band(25, 20) and within_band(15, 20)
     assert not within_band(25.1, 20)
+
+
+def test_the_prompt_aims_inside_the_pass_band():
+    from homeset.plan_time import AIM_MINUTES, BAND_MINUTES
+    from homeset.prompt import SYSTEM_PROMPT
+
+    assert AIM_MINUTES < BAND_MINUTES
+    assert f"within {AIM_MINUTES} minutes of the requested time" in SYSTEM_PROMPT
+    assert "__AIM_MINUTES__" not in SYSTEM_PROMPT

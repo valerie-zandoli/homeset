@@ -4,7 +4,10 @@ Time model (an assumption to tune after the first test run; see PRD Section 3a):
   - 3 seconds per rep
   - the rest time given for each set
   - 30 seconds between exercises
-A plan passes when its total is within 5 minutes of the time the user asked for.
+A plan passes when its total is within 5 minutes of the time the user asked for.  The
+agent aims for 2 minutes (AIM_MINUTES) so that a plan does not stop at the edge of the band:
+in 21 live plans on 2026-10-13/14 the mean was +0.8 minutes but the spread ran from -3.0
+to +4.8, and the prompt only asked the model to stop once it was inside the band.
 
 Timed moves such as planks are a non-goal for version 1:  wger does not mark which
 exercises are timed, so every exercise is counted by reps.
@@ -16,7 +19,8 @@ from typing import Iterable, Mapping
 
 SECONDS_PER_REP = 3
 TRANSITION_SECONDS = 30
-BAND_MINUTES = 5
+BAND_MINUTES = 5  # the pass rule (PRD success metric); do not change without the PRD
+AIM_MINUTES = 2  # what the prompt asks the model to land within
 
 
 def calculate_plan_time(exercises: Iterable[Mapping[str, int]]) -> float:
