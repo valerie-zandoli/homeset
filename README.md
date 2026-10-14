@@ -38,6 +38,9 @@ python -m homeset "I have 20 minutes, a mat, and dumbbells.  Work on legs."
 python -m homeset --mock "I have 20 minutes and dumbbells.  Chest."   # canned wger data
 python evals/run_evals.py evals/cases/eval_card.json                  # needs the key
 python evals/run_evals.py evals/cases/eval_card.json --only case3_adversarial
+python evals/run_evals.py evals/cases/multi_turn.json                 # conversations; needs the key
+python evals/run_evals.py evals/cases/injection.json                  # poisoned description, notes, aliases
+python evals/run_evals.py evals/cases/regressions.json                # failures found in real runs
 python scripts/scan_wger_text.py                                    # live wger text; run before the demo
 ```
 
@@ -56,6 +59,8 @@ user message -> model + system prompt -> tool runner -> wger
 - Code adds `language=2`, always adds bodyweight (equipment 7), repeats a filter once per value, follows the next-page link, and marks any cut list ("showing 40 of 56").
 - Every plan passes five checks before the user sees it:  exact format, names from wger, equipment the user has, total within 5 minutes, safety line.  One failed check sends the plan back once; a second failure shows a visible error and no plan.
 - A request stops at 10 tool calls.
+- Guarantees are tested in code with no model (`tests/test_guarantees.py`):  only labels reach wger, only GET requests leave, only wger links are followed, and every free-text field except the name is dropped.
+- Every failure found live gets a row in `docs/regressions.md` and a test or case in the same commit as the fix.
 
 ## Open items
 
