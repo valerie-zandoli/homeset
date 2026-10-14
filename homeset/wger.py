@@ -11,7 +11,7 @@ What the PRD (Section 3a) and diagram v3 require of this module:
     user lacks (a bench) is dropped here
   - only read-only GET requests; nothing is written
 
-Added 2026-10-14 (Failure Modes lesson; proposed, not in the PRD):
+Added 2026-10-14 (Failure Modes lesson; in PRD sections 3a, 3c, and 3d):
   - a 200 response must carry an integer count and a list of results; anything else is a
     failure (WgerUnavailable), never an empty list, because "no exercises" would tell the
     user a fact the code does not know
