@@ -34,12 +34,39 @@ MAX_NAME_LENGTH = 45  # the longest English name on wger is 42 (scan 2026-10-13)
 _SENTENCE_BREAK = re.compile(r"[A-Za-z]{2,}[.!?]\s+[A-Z]")  # "Up.  Ignore", not "w. Rotation"
 
 
+MAX_NAME_WORDS = 8  # the longest real name has 7 words (932 English names, scan 2026-10-14)
+# Letters (accents included), digits, spaces, and the punctuation that real names use:
+# ( ) - , / : ' ’ | + & – ° > and a dot.  No double quotes, angle-bracket tags, semicolons,
+# at-signs, or backticks, and no dot between two word characters, so markup, URLs, e-mail
+# addresses, and shell text cannot sit inside a name.
+_ALLOWED_NAME = re.compile(r"^[^\W_](?:[^\W_]|[ ()\-,/:'’|+&–°>.])*$")
+_DOT_BETWEEN_WORDS = re.compile(r"\w\.\w")  # example.com, a.b; "Curls w. Rotation" is fine
+# Instruction, advert, and role-play words.  None of the 932 real names contains one.
+_DENIED_WORDS = re.compile(
+    r"\b(ignore|disregard|forget|instruction|instructions|prompt|system|override|tell|ask|say|"
+    r"buy|purchase|visit|click|http|https|www|doctor|physician|skip|stop|never|always|must|should|"
+    r"user|assistant|supplement|discount|promo|warning|warnings|advice|medical|safety)\b",
+    re.IGNORECASE,
+)
+
+
 def is_safe_name(name: str) -> bool:
-    """A name is a short label, not a sentence.  Exercise names are community-edited and
-    always reach the model, so a long name, a line break, or a sentence break inside the
-    name is dropped before the model sees it (diagram v3 proposal:  name length and
-    character check).  This does not stop every injection; it removes the obvious ones."""
-    return 0 < len(name) <= MAX_NAME_LENGTH and "\n" not in name and not _SENTENCE_BREAK.search(name)
+    """A name is a short label, not a sentence or an instruction.  Exercise names are
+    community-edited and always reach the model and then the user, so a name is dropped
+    before the model sees it when it is long, has a line break or a sentence break, has more
+    than 8 words, uses a character no real name uses, or contains an instruction or advert
+    word.  This does not stop every injection (plain wording with other words gets
+    through); it removes the obvious ones.  The scan script reports any real name this
+    drops, and tests/fixtures/wger_english_names.json must stay at zero drops."""
+    return (
+        0 < len(name) <= MAX_NAME_LENGTH
+        and "\n" not in name
+        and len(name.split()) <= MAX_NAME_WORDS
+        and bool(_ALLOWED_NAME.match(name))
+        and not _SENTENCE_BREAK.search(name)
+        and not _DOT_BETWEEN_WORDS.search(name)
+        and not _DENIED_WORDS.search(name)
+    )
 
 
 class WgerUnavailable(RuntimeError):
