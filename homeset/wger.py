@@ -10,6 +10,14 @@ What the PRD (Section 3a) and diagram v3 require of this module:
   - the equipment filter matches ANY listed item, so an exercise that also needs gear the
     user lacks (a bench) is dropped here
   - only read-only GET requests; nothing is written
+
+Added 2026-10-14 (Failure Modes lesson; proposed, not in the PRD):
+  - a 200 response must carry an integer count and a list of results; anything else is a
+    failure (WgerUnavailable), never an empty list, because "no exercises" would tell the
+    user a fact the code does not know
+  - when half or more of the examined results have no readable English name, the answer is a
+    failure:  that is a changed response shape, not an empty database
+  - one search call may take at most 30 seconds in total, retries included
 """
 
 from __future__ import annotations
@@ -29,6 +37,9 @@ PAGE_SIZE = 20
 MAX_RESULTS_PER_SEARCH = 40  # two pages per muscle; the cut is marked when more exist
 TIMEOUT_SECONDS = 10
 RETRY_WAIT_SECONDS = 1.0
+MAX_SECONDS_PER_SEARCH = 30  # all muscles, pages, and retries; a request already sent can still run to its 10 s timeout
+MIN_EXAMINED_FOR_SHAPE_CHECK = 5
+MAX_UNREADABLE_SHARE = 0.5  # live baseline 2026-10-14:  0 of 938 examined across the 12 focus labels
 
 
 MAX_NAME_LENGTH = 45  # the longest English name on wger is 42 (scan 2026-10-13)
@@ -81,8 +92,29 @@ def _default_get(url: str, params: list[tuple[str, Any]] | None, timeout: int) -
     return requests.get(url, params=params, timeout=timeout)
 
 
+def _read_page(response: Any) -> tuple[dict | None, str]:
+    """The page, or None and the reason.  A 200 whose body is not a page is a failure:  read
+    as an empty list, it would tell the user that wger has no exercises.  The reason is
+    fixed wording, never text from the response."""
+    try:
+        data = response.json()
+    except ValueError:
+        return None, "the response was not JSON"
+    if not isinstance(data, dict):
+        return None, "the response was not a JSON object"
+    count, results, next_url = data.get("count"), data.get("results"), data.get("next")
+    if isinstance(count, bool) or not isinstance(count, int) or count < 0:
+        return None, "the response had no integer count"
+    if not isinstance(results, list) or not all(isinstance(r, dict) for r in results):
+        return None, "the response had no list of results"
+    if next_url is not None and not isinstance(next_url, str):
+        return None, "the next link was not text"
+    return data, ""
+
+
 def _fetch_json(url: str, params: list[tuple[str, Any]] | None, get: Getter, sleep=time.sleep) -> dict:
-    """GET with a timeout and one retry on timeout, connection error, HTTP 429, or 5xx."""
+    """GET with a timeout and one retry on timeout, connection error, HTTP 429, 5xx, or a 200
+    whose body is not a results page."""
     last_error = "unknown error"
     for attempt in range(2):
         try:
@@ -91,17 +123,37 @@ def _fetch_json(url: str, params: list[tuple[str, Any]] | None, get: Getter, sle
             last_error = f"{type(err).__name__}"
         else:
             if response.status_code == 200:
-                return response.json()
-            last_error = f"HTTP {response.status_code}"
-            if response.status_code != 429 and response.status_code < 500:
-                break  # a 4xx that is not 429 will not improve on retry
-            wait = response.headers.get("Retry-After") if hasattr(response, "headers") else None
-            if wait and str(wait).isdigit():
-                sleep(min(int(wait), 5))
-                continue
+                page, problem = _read_page(response)
+                if page is not None:
+                    return page
+                last_error = problem  # a healthy status with an unusable body is a failure
+            else:
+                last_error = f"HTTP {response.status_code}"
+                if response.status_code != 429 and response.status_code < 500:
+                    break  # a 4xx that is not 429 will not improve on retry
+                wait = response.headers.get("Retry-After") if hasattr(response, "headers") else None
+                if wait and str(wait).isdigit():
+                    sleep(min(int(wait), 5))
+                    continue
         if attempt == 0:
             sleep(RETRY_WAIT_SECONDS)
     raise WgerUnavailable(last_error)
+
+
+def _english_translation(raw: dict) -> dict | None:
+    """The English translation with a name, or None.  A translations field of any other
+    shape counts as no translation."""
+    translations = raw.get("translations")
+    if not isinstance(translations, list):
+        return None
+    return next(
+        (
+            t
+            for t in translations
+            if isinstance(t, dict) and t.get("language") == ENGLISH_LANGUAGE_ID and t.get("name")
+        ),
+        None,
+    )
 
 
 def clean_exercise(raw: dict, include_description: bool = False) -> dict | None:
@@ -111,10 +163,7 @@ def clean_exercise(raw: dict, include_description: bool = False) -> dict | None:
     dropped unless asked for:  it is community-edited text and a way for injected
     instructions to reach the model (a proposal in diagram v3, not yet in the PRD).
     """
-    english = next(
-        (t for t in raw.get("translations", []) if t.get("language") == ENGLISH_LANGUAGE_ID and t.get("name")),
-        None,
-    )
+    english = _english_translation(raw)
     if english is None or not is_safe_name(english["name"].strip()):
         return None
     equipment = raw.get("equipment") or []
@@ -146,20 +195,30 @@ def _search_one(
     params: list[tuple[str, Any]] = [("language", ENGLISH_LANGUAGE_ID), ("limit", PAGE_SIZE), (filter_name, filter_id)]
     params += [("equipment", e) for e in owned_ids]  # repeated once per value
     url: str | None = BASE_URL
-    count, seen, kept, skipped = 0, 0, [], 0
+    count, seen, kept, skipped, unreadable = 0, 0, [], 0, 0
     while url and seen < MAX_RESULTS_PER_SEARCH:
         page = _fetch_json(url, params if url == BASE_URL else None, get, sleep)
-        count = page.get("count", count)
-        for raw in page.get("results", []):
+        count = page["count"]
+        for raw in page["results"]:
             seen += 1
-            record = clean_exercise(raw, include_description)
+            try:
+                readable = _english_translation(raw) is not None
+                record = clean_exercise(raw, include_description) if readable else None
+            except (AttributeError, TypeError, KeyError, ValueError):
+                readable, record = False, None  # a record of an unexpected shape is counted, not ignored
+            if not readable:
+                unreadable += 1
             if record is None:
                 skipped += 1
             elif set(record["equipment_ids"]) <= set(owned_ids):  # drop gear the user lacks
                 kept.append(record)
-        url = page.get("next")
+        url = page["next"] if "next" in page else None
         if url and not url.startswith(BASE_URL):
             url = None  # a next link must stay on wger; a response cannot send us elsewhere
+    if seen >= MIN_EXAMINED_FOR_SHAPE_CHECK and unreadable / seen >= MAX_UNREADABLE_SHARE:
+        # Many results with no readable English name look like a changed response shape, not an
+        # empty database.  An unsafe name that the filter drops is not counted here.
+        raise WgerUnavailable(f"{unreadable} of {seen} results had no readable English name")
     cut = count > seen
     return {
         "count": count,
@@ -167,6 +226,7 @@ def _search_one(
         "cut": cut,
         "note": f"showing {seen} of {count}" if cut else None,
         "skipped_names": skipped,  # no English name, or a name that is not a short label
+        "unreadable": unreadable,  # no readable English name (a shape problem, not a filtered name)
         "exercises": kept,
     }
 
@@ -177,19 +237,28 @@ def search_exercises(
     get: Getter = _default_get,
     sleep=time.sleep,
     include_description: bool = False,
+    clock: Callable[[], float] = time.monotonic,
 ) -> dict:
     """The tool the model calls.  Labels in, grouped clean exercises out.
 
     focus: one FOCUS label (or alias).  equipment: EQUIPMENT labels (or aliases).
     Runs one wger search per muscle in the focus label (never more than five).
-    Raises UnknownLabel for a label outside the fixed lists, WgerUnavailable for wger failures.
+    Raises UnknownLabel for a label outside the fixed lists, WgerUnavailable for wger failures
+    (including a response that is not a results page and a call that outlasts the deadline).
     """
     f = focus_filters(focus)
     owned = equipment_ids(equipment)
     searches = [("muscles", m) for m in f.muscle_ids] or [("category", c) for c in f.category_ids]
+    started = clock()
+
+    def get_within_deadline(url: str, params: list[tuple[str, Any]] | None, timeout: int) -> Any:
+        if clock() - started > MAX_SECONDS_PER_SEARCH:
+            raise WgerUnavailable(f"the search took longer than {MAX_SECONDS_PER_SEARCH} seconds")
+        return get(url, params, timeout)
+
     groups, used = [], set()
     for filter_name, filter_id in searches:
-        result = _search_one(filter_name, filter_id, owned, get, sleep, include_description)
+        result = _search_one(filter_name, filter_id, owned, get_within_deadline, sleep, include_description)
         unique = []
         for ex in result["exercises"]:  # an exercise can match several muscles; list it once
             if ex["id"] not in used:

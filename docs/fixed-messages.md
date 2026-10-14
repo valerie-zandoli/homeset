@@ -9,7 +9,7 @@ harness has to recognize them.  A fixed opening sentence makes that a string mat
 
 | # | When | Exact message (slots in angle brackets) | Kind |
 |---|---|---|---|
-| 1 | wger cannot be reached after one retry | I could not reach the exercise database.  Would you like me to try once more? | error |
+| 1 | wger cannot be reached after one retry, answers with a response that is not a results page, or takes longer than 30 seconds in total | I could not reach the exercise database.  Would you like me to try once more? | error |
 | 2 | the search returns no exercises | I could not find any exercises for \<focus\> with \<equipment\>.  Would you like to try a different focus or add equipment? | question |
 | 3 | too few exercises for the time | I found only \<n\> exercises for \<focus\> with \<equipment\>, which is not enough for \<minutes\> minutes.  Would you like a shorter workout of about \<shorter\> minutes? | question |
 | 4 | minutes outside 10 to 45 (for example "2-minute full-body workout") | I plan workouts of 10 to 45 minutes, and \<n\> minutes is outside that range.  How many minutes do you have, between 10 and 45? | question |
