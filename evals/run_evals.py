@@ -25,6 +25,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
 from homeset.agent import run_conversation, run_once  # noqa: E402
+from homeset.harness import RequestState, handle_request  # noqa: E402
 from homeset.mock_wger import mock_get, mock_search  # noqa: E402
 from homeset.wger import WgerUnavailable, _default_get as wger_default_get, search_exercises  # noqa: E402
 
@@ -121,7 +122,10 @@ def main() -> int:
             want = ",".join(t["expect"]["kind"] for t in turns)
             print(f"{'PASS' if ok else 'FAIL'}  {case['id']}  expected={want}  got={got}")
             continue
-        outcome = run_once(case["input"], search)
+        if "scripted_reply" in case:  # model-free case:  the reply is fixed and the harness is real
+            outcome = handle_request(case["input"], lambda _text: case["scripted_reply"], RequestState(case["input"]))
+        else:
+            outcome = run_once(case["input"], search)
         ok = meets(outcome, case["expect"])
         passed += ok
         rows.append({"id": case["id"], "expected_kind": case["expect"]["kind"], "kind": outcome.kind, "pass": ok,

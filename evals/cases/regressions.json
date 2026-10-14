@@ -27,6 +27,21 @@
       },
       "inject": "parentheses_names",
       "notes_setup": "The runner appends ' (Floor)' to every English exercise name on the raw page, because a live page does not always contain a name with parentheses."
+    },
+    {
+      "id": "reg_plan_wrapped_in_question",
+      "label": "A plan with a preamble and a closing question mark is checked, not waved through",
+      "input": "I have 3 minutes and dumbbells.  Chest.",
+      "scripted_reply": "Sure, here is your workout.\nHomeSet plan: 3 min, dumbbells, chest\n1. Invented Move (dumbbells): 3 sets x 10 reps, rest 30 s\nTotal time: 3.0 min (calculated)\nShall I make it harder?",
+      "expect": {
+        "kind": "error",
+        "starts_with": "HomeSet could not produce a plan",
+        "must_not_contain": [
+          "Invented Move"
+        ],
+        "notes": "The reply carries plan markers, so the output checks run; the invented name and the missing safety line fail them, and the user sees the visible error and no plan.  A failing score is kind 'question' or 'plan'."
+      },
+      "notes_setup": "Model-free:  the model's reply is scripted and the real harness runs it, so this case needs no key.  Found 2026-10-14 by calling classify() directly, not in a live run."
     }
   ]
 }
