@@ -8,7 +8,7 @@ Based on Yadan's script of 2026-10-13 (8 slides, Valerie on 1, 2, 3, 6, 7 and Ya
 
 | Item | Value |
 |---|---|
-| Spoken words, without the "cut first" paragraph | about 458 (script 443 plus about 15 for your personal reason), which is 3:03 at 150 words per minute and 3:31 at 130; add about 10 seconds for the three hand-offs.  Not yet timed with a stopwatch. |
+| Spoken words, without the "cut first" paragraph | 464, which is 3:06 at 150 words per minute and 3:34 at 130; add about 10 seconds for the three hand-offs.  Not yet timed with a stopwatch. |
 | Target | under 3 minutes 45 seconds; hard cap 4 minutes |
 | Stopwatch time | Run one rehearsal and write the measured time here:  ______ |
 | Cut order if over | 1. slide 6, "cut first" paragraph.  2. slide 7, the second sentence.  3. slide 5, the last two sentences. |
@@ -19,7 +19,7 @@ Based on Yadan's script of 2026-10-13 (8 slides, Valerie on 1, 2, 3, 6, 7 and Ya
 
 On screen:  big "HomeSet" title, our names, and one line:  "Consumer fitness · workout planning".
 
-Hi everyone!  We are Valerie and Yadan, and our agent is HomeSet.  We chose consumer fitness, and within it workout planning, the work a trainer does when writing one session.  Many people try fitness apps and drop them, and one session is a small, safe job for an agent.  [Valerie:  add one sentence with your personal reason for choosing fitness.]
+Hi everyone!  We are Valerie and Yadan, and our agent is HomeSet.  We chose consumer fitness, and within it workout planning, the work a trainer does when writing one session.  Many people try fitness apps and drop them, and one session is a small, safe job for an agent.  For me it is also personal:  fitness matters to me, and it fits my lifelong interest in health, medicine, and well-being.
 
 ▶ Click
 
