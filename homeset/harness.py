@@ -22,6 +22,7 @@ import re
 from dataclasses import dataclass, field
 from typing import Callable
 
+from .assumed import mark_assumed
 from .checks import check_plan, classify
 from .labels import UnknownLabel
 from .plan_time import calculate_plan_time
@@ -49,16 +50,21 @@ class RequestState:
     owned_equipment_ids: set[int] = field(default_factory=set)
     known_exercises: dict[str, list[int]] = field(default_factory=dict)  # name -> equipment ids
     budget_exceeded: bool = False
+    conversation_text: str = ""  # every user message so far; the "(assumed)" marker reads it
 
     def __post_init__(self) -> None:
         if self.requested_minutes is None:
             self.requested_minutes = extract_minutes(self.user_message)
+        if not self.conversation_text:
+            self.conversation_text = self.user_message
 
     def reset_for(self, message: str) -> None:
         """Start the next turn of one conversation.  The tool budget, the exercises seen,
         and the budget flag restart; the minutes carry over when the new message names none
         (a follow-up such as "swap the first one" keeps the earlier time)."""
         self.user_message = message
+        if message not in self.conversation_text:
+            self.conversation_text = f"{self.conversation_text}  {message}"
         self.requested_minutes = extract_minutes(message) or self.requested_minutes
         self.tool_calls = 0
         self.owned_equipment_ids = set()
@@ -151,6 +157,7 @@ def handle_request(user_message: str, ask_model: Callable[[str], str], state: Re
         kind = classify(text)
         if kind in ("handoff", "error", "question"):  # direct path: skip the output checks
             return Outcome(kind, text)
+        text = mark_assumed(text, state.conversation_text)  # code writes "(assumed)", not the model
         failures = check_plan(text, state.known_exercises, state.owned_equipment_ids, state.requested_minutes)
         if not failures:
             return Outcome("plan", text)
