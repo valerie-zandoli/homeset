@@ -20,6 +20,7 @@ from typing import Any, Callable
 
 import requests
 
+from .gear import gear_ids_from_name
 from .labels import BODYWEIGHT_ID, equipment_ids, focus_filters
 
 BASE_URL = "https://wger.de/api/v2/exerciseinfo/"
@@ -121,7 +122,11 @@ def clean_exercise(raw: dict, include_description: bool = False) -> dict | None:
         "id": raw.get("id"),
         "name": english["name"].strip(),
         "equipment": [e.get("name", "") for e in equipment] or ["none (bodyweight exercise)"],
-        "equipment_ids": sorted({e["id"] for e in equipment if "id" in e} or {BODYWEIGHT_ID}),
+        # The tag is community data and can disagree with the name ("Biceps with TRX" is tagged
+        # bodyweight), so the gear the name implies counts too (homeset/gear.py).
+        "equipment_ids": sorted(
+            ({e["id"] for e in equipment if "id" in e} or {BODYWEIGHT_ID}) | gear_ids_from_name(english["name"])
+        ),
         "muscles": [m.get("name_en") or m.get("name", "") for m in raw.get("muscles", [])],
         "category": (raw.get("category") or {}).get("name", ""),
     }

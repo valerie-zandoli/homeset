@@ -88,9 +88,12 @@ def test_gear_the_user_lacks_is_dropped():
 
 
 def test_english_name_is_used_for_fixture_rows_with_other_languages_first():
-    result = wger.search_exercises("chest", ["dumbbells"], get=mock_get, sleep=no_sleep)
+    # The name says "Cross-Bench", so the user needs a bench as well as dumbbells (homeset/gear.py).
+    result = wger.search_exercises("chest", ["dumbbells", "bench"], get=mock_get, sleep=no_sleep)
     names = [e["name"] for g in result["groups"] for e in g["exercises"]]
     assert "Cross-Bench Dumbbell Pullovers" in names
+    without_bench = wger.search_exercises("chest", ["dumbbells"], get=mock_get, sleep=no_sleep)
+    assert "Cross-Bench Dumbbell Pullovers" not in [e["name"] for g in without_bench["groups"] for e in g["exercises"]]
 
 
 def test_a_cut_list_is_marked():
