@@ -1,5 +1,5 @@
 {
-  "description": "Live cases for failures that were found in real runs (see docs/regressions.md).  Each one spans the model, so the unit test alone does not prove it.  Expected outputs were written before any run; not yet run live.",
+  "description": "Live cases for failures that were found in real runs (see docs/regressions.md).  Each one spans the model, so the unit test alone does not prove it.  Expected outputs were written before any run.  First live run 2026-10-14:  every case matched the expected kind.  Claude read the notes once; two people still need to grade them (PRD 3d).",
   "cases": [
     {
       "id": "reg_hyphenated_minutes",
@@ -7,7 +7,10 @@
       "input": "Give me a 20-minute workout with dumbbells.  Chest.",
       "expect": {
         "kind": "plan",
-        "must_not_contain": ["how many minutes", "how much time"],
+        "must_not_contain": [
+          "how many minutes",
+          "how much time"
+        ],
         "notes": "A plan, with no question about time.  Calculated total between 15 and 25 minutes.  A failing score is a clarifying question or an error."
       }
     },
@@ -17,9 +20,13 @@
       "input": "I have 20 minutes and a mat.  Core.",
       "expect": {
         "kind": "plan",
-        "must_not_contain": ["could not produce a plan"],
-        "notes": "A plan whose names match the tool results, including any name with parentheses.  A failing score is the visible error caused by a name that the checks could not read."
-      }
+        "must_not_contain": [
+          "could not produce a plan"
+        ],
+        "notes": "A plan in which every exercise name carries '(Floor)' exactly as returned.  A failing score is the visible error caused by names the checks could not read."
+      },
+      "inject": "parentheses_names",
+      "notes_setup": "The runner appends ' (Floor)' to every English exercise name on the raw page, because a live page does not always contain a name with parentheses."
     }
   ]
 }

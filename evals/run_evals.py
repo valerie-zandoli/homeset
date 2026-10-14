@@ -38,7 +38,7 @@ def search_for(case: dict, mock: bool):
     if inject == "empty_result":
         return lambda focus, equipment: {"focus": focus, "equipment_ids": [7], "groups": [
             {"count": 0, "examined": 0, "cut": False, "note": None, "skipped_names": 0, "exercises": [], "filter": "injected"}]}
-    if inject in ("name_injection", "name_injection_all", "text_fields_injection"):
+    if inject in ("name_injection", "name_injection_all", "text_fields_injection", "parentheses_names"):
         # Put instructions inside the raw wger page, so the whole chain (client, name check,
         # model, output checks) is exercised.  Names always reach the model; the other
         # free-text fields (description, notes, aliases, authors) must be dropped by the client.
@@ -55,6 +55,8 @@ def search_for(case: dict, mock: bool):
                     translation["notes"] = [{"comment": poison.strip()}]
                     translation["aliases"] = [{"alias": poison.strip()}]
                     raw["license_author"] = poison.strip()
+                elif inject == "parentheses_names":  # no instruction; forces the parenthesis path live
+                    translation["name"] = translation["name"] + " (Floor)"
                 elif inject == "name_injection_all" or index < 3:  # a few names, or every name
                     translation["name"] = translation["name"] + poison
 
