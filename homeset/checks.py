@@ -124,6 +124,19 @@ def parse_plan(text: str, known_names: list[str] | None = None) -> ParsedPlan:
     return ParsedPlan(float(m.group(1)), exercises, float(tm.group(1)))
 
 
+CHECK_NAMES = ("format", "safety line", "name", "equipment", "level", "reps", "total", "time")
+
+
+def check_results(failures: list[str]) -> dict[str, bool | None]:
+    """Pass (True) or fail (False) for each named check, read from the failure messages.
+
+    A format failure ends the checks early, so the other checks were not evaluated (None).
+    """
+    if any(f.startswith("format:") for f in failures):
+        return {name: (False if name == "format" else None) for name in CHECK_NAMES}
+    return {name: not any(f.startswith(f"{name}:") for f in failures) for name in CHECK_NAMES}
+
+
 def check_plan(
     text: str,
     known_exercises: dict[str, list[int]],

@@ -22,12 +22,12 @@ import re
 from dataclasses import dataclass, field
 from typing import Callable
 
-from .assumed import mark_assumed
-from .checks import HANDOFF_SENTENCE, check_plan, classify
+from .assumed import MARKER, mark_assumed
+from .checks import HANDOFF_SENTENCE, check_plan, check_results, classify
 from .triggers import find_trigger
 from .labels import UnknownLabel
 from .plan_time import calculate_plan_time
-from .trace import Trace
+from .trace import Trace, clip
 from .wger import WgerUnavailable, search_exercises
 
 MAX_TOOL_CALLS = 10
@@ -244,26 +244,53 @@ def handle_request(user_message: str, ask_model: Callable[[str], str], state: Re
     outcome = _run_request(user_message, ask_model, state)
     outcome.tool_errors = list(state.tool_errors)
     outcome.retry_fired = state.retry_fired
+    state.trace.add(
+        "outcome", kind=outcome.kind, retry_fired=state.retry_fired, failures=list(outcome.failures),
+        tool_errors=list(state.tool_errors), reason=outcome.reason, text=clip(outcome.text),
+    )
     outcome.trace = state.trace.as_list()
     return outcome
 
 
+def _ask(ask_model: Callable[[str], str], state: RequestState, prompt: str, attempt: int) -> str:
+    """One model call, on record:  what was sent (the tool calls land between these two events)
+    and what came back, with the harness's reading of its kind."""
+    state.trace.add("model_call", attempt=attempt, prompt=clip(prompt))
+    text = ask_model(prompt)
+    state.trace.add("model_reply", attempt=attempt, kind=classify(text), text=clip(text))
+    return text
+
+
 def _run_request(user_message: str, ask_model: Callable[[str], str], state: RequestState) -> Outcome:
+    state.trace.add("request", message=clip(user_message), minutes_requested=state.requested_minutes)
     trigger = find_trigger(state.conversation_text or user_message)
-    if trigger:
+    state.trace.add("trigger", fired=trigger is not None, word=trigger)
+    if trigger:  # the model is never called
         return Outcome("handoff", HANDOFF_SENTENCE, reason=trigger)
-    text = ask_model(user_message)
+    text = _ask(ask_model, state, user_message, 0)
     for attempt in range(MAX_REGENERATIONS + 1):
         if state.budget_exceeded:
+            state.trace.add("budget_exceeded", attempt=attempt)
             return Outcome("error", BUDGET_MESSAGE)
         kind = classify(text)
         if kind in ("handoff", "error", "question"):  # direct path: skip the output checks
+            state.trace.add("checks", attempt=attempt, skipped=True, reason=f"direct path: {kind}")
             return Outcome(kind, text)
-        text = mark_assumed(text, state.conversation_text)  # code writes "(assumed)", not the model
+        marked = mark_assumed(text, state.conversation_text)  # code writes "(assumed)", not the model
+        state.trace.add(
+            "assumed", attempt=attempt, model_wrote_marker=MARKER in text, code_changed_line_1=marked != text
+        )
+        text = marked
         failures = check_plan(text, state.known_exercises, state.owned_equipment_ids, state.requested_minutes)
+        state.trace.add(
+            "checks", attempt=attempt, skipped=False, passed=not failures, results=check_results(failures),
+            failures=list(failures),
+        )
         if not failures:
             return Outcome("plan", text)
         if attempt == MAX_REGENERATIONS:
             return Outcome("error", ERROR_MESSAGE, failures)
-        text = ask_model(_feedback(failures))
+        state.retry_fired = True
+        state.trace.add("regenerate", attempt=attempt + 1, failures=list(failures))
+        text = _ask(ask_model, state, _feedback(failures), attempt + 1)
     return Outcome("error", ERROR_MESSAGE)  # unreachable; keeps the type checker calm

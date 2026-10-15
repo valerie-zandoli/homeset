@@ -141,3 +141,131 @@ def test_bad_time_input_is_recorded_as_a_failure():
     time_tool([{"sets": "many", "reps": 10, "rest_seconds": 30}])
     result, = events_named(state, "tool_result")
     assert result["ok"] is False and result["error"] == "bad_input"
+
+
+# --- the request path ---------------------------------------------------------------------
+
+from homeset.agent import run_conversation  # noqa: E402
+from homeset.checks import CHECK_NAMES, SAFETY_LINE, check_results  # noqa: E402
+from homeset.harness import BUDGET_MESSAGE, ERROR_MESSAGE  # noqa: E402
+
+GOOD_PLAN = "\n".join(
+    [
+        "HomeSet plan: 3 min, dumbbells, chest",
+        "1. Fly With Dumbbells (item 3): 3 sets x 10 reps, rest 30 s",
+        "Total time: 3.0 min (calculated)",
+        SAFETY_LINE,
+    ]
+)
+
+
+def names(outcome):
+    return [e["event"] for e in outcome.trace]
+
+
+def asking(state, *replies):
+    """A scripted model that searches once on its first call, then gives the next reply."""
+    answers = iter(replies)
+    search_tool, _ = make_tools(state, mock_search)
+    first = []
+
+    def ask(text):
+        if not first:
+            first.append(True)
+            search_tool("chest", ["dumbbells"])
+        return next(answers)
+
+    return ask
+
+
+def test_a_plan_that_passes_leaves_every_step_in_order():
+    state = RequestState("I have 3 minutes and dumbbells.  Chest.")
+    outcome = handle_request(state.user_message, asking(state, GOOD_PLAN), state)
+    assert outcome.kind == "plan" and outcome.retry_fired is False
+    assert names(outcome) == [
+        "request", "trigger", "model_call", "tool_call", "tool_result", "model_reply", "assumed", "checks", "outcome",
+    ]
+    by_name = {e["event"]: e for e in outcome.trace}
+    assert by_name["request"]["minutes_requested"] == 3
+    assert by_name["trigger"]["fired"] is False
+    assert by_name["model_call"]["prompt"] == state.user_message and by_name["model_call"]["attempt"] == 0
+    assert by_name["model_reply"]["kind"] == "plan"
+    assert by_name["assumed"] == {**by_name["assumed"], "model_wrote_marker": False, "code_changed_line_1": False}
+    assert by_name["checks"]["passed"] is True and all(by_name["checks"]["results"].values())
+    assert by_name["outcome"]["kind"] == "plan" and by_name["outcome"]["retry_fired"] is False
+
+
+def test_a_retry_shows_the_failed_check_then_the_second_attempt():
+    state = RequestState("I have 3 minutes and dumbbells.  Chest.")
+    outcome = handle_request(state.user_message, asking(state, "not a plan at all", GOOD_PLAN), state)
+    assert outcome.kind == "plan" and outcome.retry_fired is True
+    checks = [e for e in outcome.trace if e["event"] == "checks"]
+    assert [c["attempt"] for c in checks] == [0, 1] and [c["passed"] for c in checks] == [False, True]
+    assert checks[0]["results"]["format"] is False and checks[0]["results"]["time"] is None  # stopped at format
+    regenerate, = [e for e in outcome.trace if e["event"] == "regenerate"]
+    assert regenerate["attempt"] == 1 and regenerate["failures"] == checks[0]["failures"]
+    calls = [e for e in outcome.trace if e["event"] == "model_call"]
+    assert [c["attempt"] for c in calls] == [0, 1] and "failed these checks" in calls[1]["prompt"]
+
+
+def test_two_failures_end_in_a_visible_error_with_both_attempts_on_record():
+    state = RequestState("I have 3 minutes and dumbbells.  Chest.")
+    outcome = handle_request(state.user_message, asking(state, "no plan", "still no plan"), state)
+    assert outcome.kind == "error" and outcome.text == ERROR_MESSAGE and outcome.retry_fired is True
+    assert names(outcome).count("checks") == 2 and names(outcome).count("regenerate") == 1
+    last = outcome.trace[-1]
+    assert last["event"] == "outcome" and last["kind"] == "error" and last["failures"]
+
+
+def test_a_code_trigger_ends_the_request_before_any_model_call():
+    state = RequestState("My knee hurts.")
+    outcome = handle_request(state.user_message, lambda text: GOOD_PLAN, state)
+    assert names(outcome) == ["request", "trigger", "outcome"]
+    assert outcome.trace[1]["fired"] is True and outcome.trace[1]["word"]
+    assert outcome.retry_fired is False
+
+
+def test_a_direct_path_reply_records_that_the_checks_were_skipped():
+    state = RequestState("Legs please.")
+    outcome = handle_request(state.user_message, lambda text: "How many minutes do you have?", state)
+    checks, = [e for e in outcome.trace if e["event"] == "checks"]
+    assert checks["skipped"] is True and checks["reason"] == "direct path: question"
+
+
+def test_a_spent_budget_is_on_record():
+    state = RequestState("I have 20 minutes.")
+    state.budget_exceeded = True
+    outcome = handle_request(state.user_message, lambda text: GOOD_PLAN, state)
+    assert outcome.kind == "error" and outcome.text == BUDGET_MESSAGE
+    assert "budget_exceeded" in names(outcome)
+
+
+def test_the_trace_shows_when_code_wrote_the_assumed_marker():
+    state = RequestState("I have 3 minutes.  Chest.")  # the user named no equipment
+    outcome = handle_request(state.user_message, asking(state, GOOD_PLAN), state)
+    assumed, = [e for e in outcome.trace if e["event"] == "assumed"]
+    assert assumed["model_wrote_marker"] is False and assumed["code_changed_line_1"] is True
+
+
+def test_check_results_name_each_check():
+    assert check_results([]) == {name: True for name in CHECK_NAMES}
+    mixed = check_results(["level: 'Pull-ups' is a version of pull-ups, which is too advanced for a beginner"])
+    assert mixed["level"] is False and mixed["name"] is True and mixed["time"] is True
+    early = check_results(["format: the plan has no exercise lines"])
+    assert early["format"] is False and all(early[n] is None for n in CHECK_NAMES if n != "format")
+
+
+def test_each_turn_of_a_conversation_has_its_own_trace():
+    class Scripted:
+        def __init__(self, replies):
+            self.replies = list(replies)
+
+        def __call__(self, text):
+            return self.replies.pop(0)
+
+    agent = Scripted(["Is it sore or sharp?", HANDOFF_SENTENCE])
+    turns = ["My lower back feels a little off.  Legs please.", "It feels sharp when I bend.  Legs please."]
+    first, second = run_conversation(turns, agent_factory=lambda state, search_fn: agent)
+    assert first.trace[0]["event"] == "request" and first.trace[0]["message"] == turns[0]
+    assert second.trace[0]["event"] == "request" and second.trace[0]["message"] == turns[1]
+    assert sum(e["event"] == "model_call" for e in second.trace) == 1  # not carried over from turn one
