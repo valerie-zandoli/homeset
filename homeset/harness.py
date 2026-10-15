@@ -118,40 +118,105 @@ def extract_minutes(message: str) -> float | None:
     return total if found else None
 
 
+def _search_summary(result: dict) -> dict:
+    """The funnel from the rows wger returned to the exercises the model was shown, as counts."""
+    groups, names = [], []
+    for group in result.get("groups", []):
+        shown = group.get("exercises", [])
+        names.extend(ex["name"] for ex in shown)
+        examined = group.get("examined", 0)
+        skipped, blocked = group.get("skipped_names", 0), group.get("blocked_advanced", 0)
+        groups.append(
+            {
+                "filter": group.get("filter"),
+                "count": group.get("count"),  # wger's total for this filter
+                "examined": examined,  # rows read
+                "unreadable": group.get("unreadable", 0),
+                "skipped_names": skipped,
+                "blocked_advanced": blocked,
+                # gear the user lacks, or an exercise already listed in an earlier group
+                "dropped_other": max(examined - skipped - blocked - len(shown), 0),
+                "shown": len(shown),
+                "cut": group.get("cut", False),
+                "note": group.get("note"),
+            }
+        )
+    return {
+        "focus": result.get("focus"),
+        "equipment_ids": result.get("equipment_ids", []),
+        "groups": groups,
+        "shown_names": names,
+    }
+
+
 def make_tools(state: RequestState, search_fn: Callable = search_exercises):
-    """Build the two tool functions the model may call.  Both return JSON strings."""
+    """Build the two tool functions the model may call.  Both return JSON strings.
+
+    Every call is traced:  the arguments the model sent, then either the failure reason or the
+    funnel of counts and the names the model was shown (state.trace, homeset/trace.py).
+    """
 
     def search_exercises_tool(focus: str, equipment: list[str]) -> str:
+        state.trace.add(
+            "tool_call", tool="search_exercises", arguments={"focus": focus, "equipment": equipment},
+            calls_before=state.tool_calls,
+        )
         try:
             state.spend()
         except ToolBudgetExceeded as err:
             state.tool_errors.append("tool_call_limit")
-            return json.dumps({"error": "tool_call_limit", "message": str(err)})
+            reply = json.dumps({"error": "tool_call_limit", "message": str(err)})
+            state.trace.add("tool_result", tool="search_exercises", ok=False, error="tool_call_limit", shown_chars=len(reply))
+            return reply
         try:
             result = search_fn(focus, equipment)
         except UnknownLabel as err:
             state.tool_errors.append("unknown_label")
-            return json.dumps({"error": "unknown_label", "message": str(err)})
+            reply = json.dumps({"error": "unknown_label", "message": str(err)})
+            state.trace.add(
+                "tool_result", tool="search_exercises", ok=False, error="unknown_label", message=str(err),
+                shown_chars=len(reply),
+            )
+            return reply
         except WgerUnavailable as err:
             state.tool_errors.append(f"wger_unavailable: {err}")  # fixed wording, never response text
-            return json.dumps({"error": "wger_unavailable", "message": f"I could not reach the exercise database ({err})"})
+            reply = json.dumps({"error": "wger_unavailable", "message": f"I could not reach the exercise database ({err})"})
+            state.trace.add(
+                "tool_result", tool="search_exercises", ok=False, error="wger_unavailable", message=str(err),
+                shown_chars=len(reply),
+            )
+            return reply
         state.owned_equipment_ids.update(result["equipment_ids"])
         for group in result["groups"]:
             for ex in group["exercises"]:
                 state.known_exercises[ex["name"]] = ex["equipment_ids"]
-        return json.dumps(result)
+        reply = json.dumps(result)
+        state.trace.add("tool_result", tool="search_exercises", ok=True, shown_chars=len(reply), **_search_summary(result))
+        return reply
 
     def calculate_plan_time_tool(exercises: list[dict]) -> str:
+        state.trace.add(
+            "tool_call", tool="calculate_plan_time", arguments={"exercises": exercises}, calls_before=state.tool_calls
+        )
         try:
             state.spend()
         except ToolBudgetExceeded as err:
             state.tool_errors.append("tool_call_limit")
-            return json.dumps({"error": "tool_call_limit", "message": str(err)})
+            reply = json.dumps({"error": "tool_call_limit", "message": str(err)})
+            state.trace.add("tool_result", tool="calculate_plan_time", ok=False, error="tool_call_limit", shown_chars=len(reply))
+            return reply
         try:
-            return json.dumps({"total_minutes": calculate_plan_time(exercises)})
+            reply = json.dumps({"total_minutes": calculate_plan_time(exercises)})
         except ValueError as err:
             state.tool_errors.append("bad_input")
-            return json.dumps({"error": "bad_input", "message": str(err)})
+            reply = json.dumps({"error": "bad_input", "message": str(err)})
+            state.trace.add(
+                "tool_result", tool="calculate_plan_time", ok=False, error="bad_input", message=str(err),
+                shown_chars=len(reply),
+            )
+            return reply
+        state.trace.add("tool_result", tool="calculate_plan_time", ok=True, total_minutes=json.loads(reply)["total_minutes"])
+        return reply
 
     return search_exercises_tool, calculate_plan_time_tool
 
