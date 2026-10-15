@@ -279,3 +279,27 @@ def test_trace_fields_are_what_a_run_row_saves_and_are_plain_json():
     fields = trace_fields(outcome)
     assert fields["retry_fired"] is True and fields["trace"] == outcome.trace
     assert json.loads(json.dumps(fields)) == fields  # survives the run file round trip
+
+
+# --- the readable view --------------------------------------------------------------------
+
+
+def test_format_trace_reads_as_one_line_per_step_with_the_funnel_and_the_failed_check():
+    from homeset.trace import format_trace
+
+    state = RequestState("I have 3 minutes and dumbbells.  Chest.")
+    outcome = handle_request(state.user_message, asking(state, "no plan", GOOD_PLAN), state)
+    text = format_trace(outcome.trace)
+    assert "search_exercises(focus='chest', equipment=['dumbbells'])" in text
+    assert "wger count" in text and "shown" in text  # the funnel line for each filter
+    assert "FAIL (format)" in text and "PASS" in text
+    assert "sent back to the model for 1 failure(s)" in text
+    assert text.rstrip().splitlines()[-1].endswith("retry fired: yes")
+
+
+def test_format_trace_names_the_trigger_that_skipped_the_model():
+    from homeset.trace import format_trace
+
+    state = RequestState("My knee hurts.")
+    outcome = handle_request(state.user_message, lambda text: GOOD_PLAN, state)
+    assert "fired on" in format_trace(outcome.trace) and "the model is not called" in format_trace(outcome.trace)
