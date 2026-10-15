@@ -269,3 +269,13 @@ def test_each_turn_of_a_conversation_has_its_own_trace():
     assert first.trace[0]["event"] == "request" and first.trace[0]["message"] == turns[0]
     assert second.trace[0]["event"] == "request" and second.trace[0]["message"] == turns[1]
     assert sum(e["event"] == "model_call" for e in second.trace) == 1  # not carried over from turn one
+
+
+def test_trace_fields_are_what_a_run_row_saves_and_are_plain_json():
+    from homeset.trace import trace_fields
+
+    state = RequestState("I have 3 minutes and dumbbells.  Chest.")
+    outcome = handle_request(state.user_message, asking(state, "no plan", GOOD_PLAN), state)
+    fields = trace_fields(outcome)
+    assert fields["retry_fired"] is True and fields["trace"] == outcome.trace
+    assert json.loads(json.dumps(fields)) == fields  # survives the run file round trip

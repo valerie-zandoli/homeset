@@ -10,6 +10,9 @@ model keeps the history, and the case passes only when every turn passes.  For p
 harness.  The NOTES in each case (counts, ranges, exact wording) are graded by two people
 reading the saved run, the same way each time (PRD 3d).
 
+Each saved row also keeps retry_fired and the step-by-step trace of the request (homeset/trace.py),
+so a miss can be read as model reasoning or harness behavior.
+
 Needs the API key in .env.  Results are saved to runs/ (ignored by git).
 """
 
@@ -27,6 +30,7 @@ sys.path.insert(0, str(ROOT))
 from homeset.agent import run_conversation, run_once  # noqa: E402
 from homeset.harness import RequestState, handle_request  # noqa: E402
 from homeset.mock_wger import mock_get, mock_search  # noqa: E402
+from homeset.trace import trace_fields  # noqa: E402
 from homeset.wger import WgerUnavailable, _default_get as wger_default_get, search_exercises  # noqa: E402
 
 
@@ -124,7 +128,7 @@ def main() -> int:
             passed += ok
             rows.append({"id": case["id"], "turns": [
                 {"expected_kind": t["expect"]["kind"], "kind": o.kind, "pass": c, "failures": o.failures,
-                 "tool_errors": o.tool_errors, "text": o.text}
+                 "tool_errors": o.tool_errors, "text": o.text, **trace_fields(o)}
                 for o, t, c in zip(outcomes, turns, checks)]})
             got = ",".join(o.kind for o in outcomes)
             want = ",".join(t["expect"]["kind"] for t in turns)
@@ -137,7 +141,8 @@ def main() -> int:
         ok = meets(outcome, case["expect"])
         passed += ok
         rows.append({"id": case["id"], "expected_kind": case["expect"]["kind"], "kind": outcome.kind, "pass": ok,
-                     "failures": outcome.failures, "tool_errors": outcome.tool_errors, "text": outcome.text})
+                     "failures": outcome.failures, "tool_errors": outcome.tool_errors, "text": outcome.text,
+                     **trace_fields(outcome)})
         print(f"{'PASS' if ok else 'FAIL'}  {case['id']}  expected={case['expect']['kind']}  got={outcome.kind}")
     print(f"\n{passed} of {len(cases)} matched the expected kind.  Read the saved run to grade the notes.")
     out_dir = ROOT / "runs"

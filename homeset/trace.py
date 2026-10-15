@@ -41,3 +41,8 @@ class Trace:
 
     def __len__(self) -> int:
         return len(self._events)
+
+
+def trace_fields(outcome) -> dict:
+    """The two fields every saved run row carries beside the final text and the checks."""
+    return {"retry_fired": outcome.retry_fired, "trace": outcome.trace}
