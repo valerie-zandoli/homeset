@@ -13,6 +13,8 @@ A plan passes when:
   5. the safety line is present
   6. no exercise is on the blocked advanced-move list (homeset/advanced.py); wger.py
      already drops them, so this is a backstop
+  7. no kettlebell move has more than 8 reps per set (homeset/rep_cap.py); only the
+     model chooses reps, so this check and the prompt are the whole guard
 """
 
 from __future__ import annotations
@@ -23,6 +25,7 @@ from dataclasses import dataclass
 from .advanced import blocked_move
 from .labels import BODYWEIGHT_ID
 from .plan_time import BAND_MINUTES, calculate_plan_time
+from .rep_cap import KETTLEBELL_MAX_REPS, over_rep_cap
 
 from .messages import HANDOFF as HANDOFF_SENTENCE
 from .messages import PREFIXES
@@ -153,6 +156,11 @@ def check_plan(
         move = blocked_move(ex["name"])
         if move:
             failures.append(f"level: {ex['name']!r} is a version of {move}, which is too advanced for a beginner")
+        if over_rep_cap(ex["name"], ex["reps"], ids or []):
+            failures.append(
+                f"reps: {ex['name']!r} has {ex['reps']} reps per set; a kettlebell move is capped at "
+                f"{KETTLEBELL_MAX_REPS} reps per set"
+            )
 
     computed = calculate_plan_time(plan.exercises)
     if abs(computed - plan.stated_total) > 0.6:
