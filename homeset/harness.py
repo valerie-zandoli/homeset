@@ -27,6 +27,7 @@ from .checks import HANDOFF_SENTENCE, check_plan, classify
 from .triggers import find_trigger
 from .labels import UnknownLabel
 from .plan_time import calculate_plan_time
+from .trace import Trace
 from .wger import WgerUnavailable, search_exercises
 
 MAX_TOOL_CALLS = 10
@@ -53,6 +54,8 @@ class RequestState:
     budget_exceeded: bool = False
     conversation_text: str = ""  # every user message so far; the "(assumed)" marker reads it
     tool_errors: list[str] = field(default_factory=list)  # fixed-wording reasons, for the run log
+    trace: Trace = field(default_factory=Trace)  # step-by-step record of this request (homeset/trace.py)
+    retry_fired: bool = False  # True when the one regeneration was used
 
     def __post_init__(self) -> None:
         if self.requested_minutes is None:
@@ -73,6 +76,8 @@ class RequestState:
         self.known_exercises = {}
         self.budget_exceeded = False
         self.tool_errors = []
+        self.trace.clear()
+        self.retry_fired = False
 
     def spend(self) -> None:
         if self.tool_calls >= MAX_TOOL_CALLS:
@@ -88,6 +93,8 @@ class Outcome:
     failures: list[str] = field(default_factory=list)
     reason: str = ""  # for a hand-off fired by code:  the trigger word that fired
     tool_errors: list[str] = field(default_factory=list)  # why a tool failed, whatever the model then wrote
+    retry_fired: bool = False  # the one regeneration was used
+    trace: list[dict] = field(default_factory=list)  # every step of the request, in order (homeset/trace.py)
 
 
 _MINUTES = re.compile(r"(\d+(?:\.\d+)?)\s*-?\s*(?:minutes?|mins?)\b", re.IGNORECASE)
@@ -171,6 +178,8 @@ def handle_request(user_message: str, ask_model: Callable[[str], str], state: Re
     """
     outcome = _run_request(user_message, ask_model, state)
     outcome.tool_errors = list(state.tool_errors)
+    outcome.retry_fired = state.retry_fired
+    outcome.trace = state.trace.as_list()
     return outcome
 
 
