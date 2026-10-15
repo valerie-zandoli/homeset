@@ -303,3 +303,31 @@ def test_format_trace_names_the_trigger_that_skipped_the_model():
     state = RequestState("My knee hurts.")
     outcome = handle_request(state.user_message, lambda text: GOOD_PLAN, state)
     assert "fired on" in format_trace(outcome.trace) and "the model is not called" in format_trace(outcome.trace)
+
+
+def test_the_trace_keeps_the_equipment_ids_of_each_shown_exercise():
+    # 2026-10-15:  wger tags "Medicine ball twist" with equipment 5 (exercise ball).  The trace used
+    # to hold names only, so a name that disagreed with its tag could not be seen in the trace.
+    def stub(focus, equipment):
+        exercises = [
+            {"id": 1, "name": "Medicine ball twist", "equipment_ids": [5]},
+            {"id": 2, "name": "Plank", "equipment_ids": [7]},
+        ]
+        group = {"filter": "muscles=6", "count": 2, "examined": 2, "cut": False, "note": None,
+                 "skipped_names": 0, "unreadable": 0, "blocked_advanced": 0, "exercises": exercises}
+        return {"focus": "core", "equipment_ids": [5, 7], "groups": [group]}
+
+    state = RequestState("I have 20 minutes and an exercise ball.  Core.")
+    search_tool, _ = make_tools(state, stub)
+    search_tool("core", ["exercise ball"])
+    result, = events_named(state, "tool_result")
+    assert result["shown_equipment"] == {"Medicine ball twist": [5], "Plank": [7]}
+    assert sorted(result["shown_equipment"]) == sorted(result["shown_names"])
+
+
+def test_shown_equipment_matches_the_tags_the_checks_read():
+    state = RequestState("I have 20 minutes and dumbbells.  Chest.")
+    search_tool, _ = make_tools(state, mock_search)
+    search_tool("chest", ["dumbbells"])
+    result, = events_named(state, "tool_result")
+    assert result["shown_equipment"] == state.known_exercises  # the same name -> ids the output checks use

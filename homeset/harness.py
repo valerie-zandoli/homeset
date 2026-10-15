@@ -120,10 +120,12 @@ def extract_minutes(message: str) -> float | None:
 
 def _search_summary(result: dict) -> dict:
     """The funnel from the rows wger returned to the exercises the model was shown, as counts."""
-    groups, names = [], []
+    groups, names, equipment = [], [], {}
     for group in result.get("groups", []):
         shown = group.get("exercises", [])
         names.extend(ex["name"] for ex in shown)
+        for ex in shown:  # the tag the equipment check will read, so a name that disagrees with it is visible
+            equipment[ex["name"]] = list(ex.get("equipment_ids", []))
         examined = group.get("examined", 0)
         skipped, blocked = group.get("skipped_names", 0), group.get("blocked_advanced", 0)
         groups.append(
@@ -146,6 +148,7 @@ def _search_summary(result: dict) -> dict:
         "equipment_ids": result.get("equipment_ids", []),
         "groups": groups,
         "shown_names": names,
+        "shown_equipment": equipment,  # exercise name -> equipment ids, as the model and the checks see them
     }
 
 
