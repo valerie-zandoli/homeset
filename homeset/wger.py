@@ -28,6 +28,7 @@ from typing import Any, Callable
 
 import requests
 
+from .advanced import blocked_move
 from .gear import gear_ids_from_name
 from .labels import BODYWEIGHT_ID, equipment_ids, focus_filters
 
@@ -195,7 +196,7 @@ def _search_one(
     params: list[tuple[str, Any]] = [("language", ENGLISH_LANGUAGE_ID), ("limit", PAGE_SIZE), (filter_name, filter_id)]
     params += [("equipment", e) for e in owned_ids]  # repeated once per value
     url: str | None = BASE_URL
-    count, seen, kept, skipped, unreadable = 0, 0, [], 0, 0
+    count, seen, kept, skipped, unreadable, blocked = 0, 0, [], 0, 0, 0
     while url and seen < MAX_RESULTS_PER_SEARCH:
         page = _fetch_json(url, params if url == BASE_URL else None, get, sleep)
         count = page["count"]
@@ -210,6 +211,8 @@ def _search_one(
                 unreadable += 1
             if record is None:
                 skipped += 1
+            elif blocked_move(record["name"]):  # too advanced for a beginner (homeset/advanced.py)
+                blocked += 1
             elif set(record["equipment_ids"]) <= set(owned_ids):  # drop gear the user lacks
                 kept.append(record)
         url = page["next"] if "next" in page else None
@@ -227,6 +230,7 @@ def _search_one(
         "note": f"showing {seen} of {count}" if cut else None,
         "skipped_names": skipped,  # no English name, or a name that is not a short label
         "unreadable": unreadable,  # no readable English name (a shape problem, not a filtered name)
+        "blocked_advanced": blocked,  # advanced moves dropped for beginners
         "exercises": kept,
     }
 

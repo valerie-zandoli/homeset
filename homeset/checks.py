@@ -11,6 +11,8 @@ A plan passes when:
   4. the total time is within 5 minutes of the time requested, and the stated total
      matches the code's own sum
   5. the safety line is present
+  6. no exercise is on the blocked advanced-move list (homeset/advanced.py); wger.py
+     already drops them, so this is a backstop
 """
 
 from __future__ import annotations
@@ -18,6 +20,7 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass
 
+from .advanced import blocked_move
 from .labels import BODYWEIGHT_ID
 from .plan_time import BAND_MINUTES, calculate_plan_time
 
@@ -147,6 +150,9 @@ def check_plan(
             failures.append(f"name: {ex['name']!r} did not come back from search_exercises")
         elif not set(ids) <= allowed:
             failures.append(f"equipment: {ex['name']!r} needs equipment the user does not have")
+        move = blocked_move(ex["name"])
+        if move:
+            failures.append(f"level: {ex['name']!r} is a version of {move}, which is too advanced for a beginner")
 
     computed = calculate_plan_time(plan.exercises)
     if abs(computed - plan.stated_total) > 0.6:
