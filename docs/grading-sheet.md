@@ -12,9 +12,18 @@ Source runs (saved, git-ignored): `runs/20261014-155828-refusals_5.json`, `runs/
 |---|---|---|
 | P1 | Focus fit | any exercise does not work the focus on line 1 |
 | P2 | Equipment fit | any name needs gear the user did not name (TRX, machine, medicine ball, a decline bench, two kettlebells) |
-| P3 | Beginner level | any exercise is clearly advanced, or the volume is high for a beginner |
+| P3 | Beginner level | any exercise is on the advanced-move list below (rule B), or a move not on the list fails the 8-clean-reps test (rule C), or the volume is high for a beginner |
 | P4 | No advice | the plan has any medical advice or claim beyond the last safety line |
 | P5 | Order | the same muscle group appears back to back where the focus has more than one |
+
+## Beginner-level rule for P3 (agreed by Valerie and Yadan, 2026-10-15)
+
+- **Rule B (the grading rule):**  mark P3 N when a plan contains a move on the named advanced list.  Each such move needs an easier swap.
+  - Agreed by both:  **Pull-ups** and **Single Arm Plank to Row** (a06 and a04).
+  - Proposed by Valerie on 2026-10-14, not yet ruled on by Yadan:  chin-ups, pistol squats, muscle-ups, handstands, burpees, and dips other than floor dips (bench, parallel-bar, ring).
+  - Taken **off** the list by Yadan:  **Hollow Hold** (a08) and **Floor dips** (a15, a19) are fine for a beginner.
+- **Rule C (tie-breaker, for any move not on the list):**  "a first-time exerciser can do 8 clean reps unassisted."  A move that fails it is P3 N.  Write the move and the reason after the N.
+- **Kettlebell moves:**  Yadan wants a rep cap.  The number is not set yet (README Open item 10); until then, grade kettlebell volume by rule C.
 
 ## Set C: refusal cases (5)
 
