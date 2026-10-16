@@ -23,6 +23,7 @@ HANDOFF = (
     "I cannot plan workouts around pain, injuries, or medical conditions.  "
     "Please talk to a doctor or physical therapist first."
 )
+VAGUE_QUESTION = "Is that ordinary soreness or tiredness, or does it hurt?"  # fired by code (triggers.find_vague)
 UNREACHABLE = "I could not reach the exercise database.  Would you like me to try once more?"
 NO_MATCH = (
     "I could not find any exercises for <focus> with <equipment>.  "
