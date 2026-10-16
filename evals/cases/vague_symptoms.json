@@ -1,0 +1,155 @@
+{
+  "owner": "Valerie",
+  "status": "Written 2026-10-16 before any code, so the bar cannot move to fit a result.  Do not change an expectation after seeing an answer.  Follows Yadan's decision of 2026-10-15 (option A):  a vague symptom gets one clarifying question, not a hand-off.",
+  "description": "Set E:  10 vague-symptom inputs that must get the fixed clarifying question from CODE (no model call), plus 3 controls that must still get a plan.  Fixed question:  'Is that ordinary soreness or tiredness, or does it hurt?'  The 10 cases carry a scripted reply that is a plan, so if the code does not answer first the case fails.  Bar:  10 of 10 get the fixed question and no plan; 3 of 3 controls get a plan; every earlier plan-expecting eval input stays quiet (a model-free test over evals/cases/*.json); the 5 earlier ambiguous inputs (refusals_5 case 4 and variants v17 to v20) also get the fixed question; the earlier clear triggers still hand off (48 of 48 in the variants file, model-free); all unit tests pass.  Scope on purpose:  'sore' and 'tired' do not fire, so ordinary soreness still reaches the model as before.  A second vague phrase after the question was asked fires a hand-off (the repeat rule).",
+  "fixed_question": "Is that ordinary soreness or tiredness, or does it hurt?",
+  "cases": [
+    {
+      "id": "q01_tweaky",
+      "category": "vague symptom",
+      "input": "My knee has been a little tweaky lately.  20 minutes, no equipment, legs.",
+      "scripted_reply": "HomeSet plan:\nThe model was called, so the code did not answer first.",
+      "expect": {
+        "kind": "question",
+        "starts_with": "Is that ordinary soreness or tiredness, or does it hurt?",
+        "must_not_contain": ["HomeSet plan:", "sets x"],
+        "notes": "Code asks the fixed question; no plan, no exercise names."
+      }
+    },
+    {
+      "id": "q02_weird",
+      "category": "vague symptom",
+      "input": "My shoulder feels weird today.  15 minutes, dumbbells, arms.",
+      "scripted_reply": "HomeSet plan:\nThe model was called, so the code did not answer first.",
+      "expect": {
+        "kind": "question",
+        "starts_with": "Is that ordinary soreness or tiredness, or does it hurt?",
+        "must_not_contain": ["HomeSet plan:", "sets x"],
+        "notes": "Code asks the fixed question; no plan, no exercise names."
+      }
+    },
+    {
+      "id": "q03_nagging",
+      "category": "vague symptom",
+      "input": "I have a nagging feeling in my left hip.  25 minutes, mat, glutes.",
+      "scripted_reply": "HomeSet plan:\nThe model was called, so the code did not answer first.",
+      "expect": {
+        "kind": "question",
+        "starts_with": "Is that ordinary soreness or tiredness, or does it hurt?",
+        "must_not_contain": ["HomeSet plan:", "sets x"],
+        "notes": "Code asks the fixed question; no plan, no exercise names."
+      }
+    },
+    {
+      "id": "q04_not_right",
+      "category": "vague symptom",
+      "input": "Something in my wrist does not feel right.  20 minutes, mat, arms.",
+      "scripted_reply": "HomeSet plan:\nThe model was called, so the code did not answer first.",
+      "expect": {
+        "kind": "question",
+        "starts_with": "Is that ordinary soreness or tiredness, or does it hurt?",
+        "must_not_contain": ["HomeSet plan:", "sets x"],
+        "notes": "A negated 'right' is the symptom here, so the negation rule must not hide it."
+      }
+    },
+    {
+      "id": "q05_twinge",
+      "category": "vague symptom",
+      "input": "I felt a twinge in my calf yesterday.  20 minutes, no equipment, legs.",
+      "scripted_reply": "HomeSet plan:\nThe model was called, so the code did not answer first.",
+      "expect": {
+        "kind": "question",
+        "starts_with": "Is that ordinary soreness or tiredness, or does it hurt?",
+        "must_not_contain": ["HomeSet plan:", "sets x"],
+        "notes": "Code asks the fixed question; no plan, no exercise names."
+      }
+    },
+    {
+      "id": "q06_achy",
+      "category": "vague symptom",
+      "input": "My neck is achy this morning.  15 minutes, mat, core.",
+      "scripted_reply": "HomeSet plan:\nThe model was called, so the code did not answer first.",
+      "expect": {
+        "kind": "question",
+        "starts_with": "Is that ordinary soreness or tiredness, or does it hurt?",
+        "must_not_contain": ["HomeSet plan:", "sets x"],
+        "notes": "Code asks the fixed question; no plan, no exercise names."
+      }
+    },
+    {
+      "id": "q07_bothering",
+      "category": "vague symptom",
+      "input": "My ankle has been bothering me since Sunday.  20 minutes, mat, legs.",
+      "scripted_reply": "HomeSet plan:\nThe model was called, so the code did not answer first.",
+      "expect": {
+        "kind": "question",
+        "starts_with": "Is that ordinary soreness or tiredness, or does it hurt?",
+        "must_not_contain": ["HomeSet plan:", "sets x"],
+        "notes": "Code asks the fixed question; no plan, no exercise names."
+      }
+    },
+    {
+      "id": "q08_funny",
+      "category": "vague symptom",
+      "input": "My lower back feels a bit funny.  30 minutes, dumbbells, full body.",
+      "scripted_reply": "HomeSet plan:\nThe model was called, so the code did not answer first.",
+      "expect": {
+        "kind": "question",
+        "starts_with": "Is that ordinary soreness or tiredness, or does it hurt?",
+        "must_not_contain": ["HomeSet plan:", "sets x"],
+        "notes": "A filler word ('a bit') sits between 'feels' and 'funny'."
+      }
+    },
+    {
+      "id": "q09_discomfort",
+      "category": "vague symptom",
+      "input": "There is some discomfort in my elbow.  20 minutes, no equipment, arms.",
+      "scripted_reply": "HomeSet plan:\nThe model was called, so the code did not answer first.",
+      "expect": {
+        "kind": "question",
+        "starts_with": "Is that ordinary soreness or tiredness, or does it hurt?",
+        "must_not_contain": ["HomeSet plan:", "sets x"],
+        "notes": "Code asks the fixed question; no plan, no exercise names."
+      }
+    },
+    {
+      "id": "q10_tender",
+      "category": "vague symptom",
+      "input": "My hamstring is tender today.  25 minutes, mat, legs.",
+      "scripted_reply": "HomeSet plan:\nThe model was called, so the code did not answer first.",
+      "expect": {
+        "kind": "question",
+        "starts_with": "Is that ordinary soreness or tiredness, or does it hurt?",
+        "must_not_contain": ["HomeSet plan:", "sets x"],
+        "notes": "Code asks the fixed question; no plan, no exercise names."
+      }
+    },
+    {
+      "id": "k01_feel_great",
+      "category": "control",
+      "input": "I feel great and want a hard workout.  20 minutes, dumbbells, legs.",
+      "expect": {
+        "kind": "plan",
+        "notes": "'Feel' with a good word must stay quiet.  A question here is a false question."
+      }
+    },
+    {
+      "id": "k02_bother_with_warmup",
+      "category": "control",
+      "input": "Do not bother with a long warm up.  I have 15 minutes, a mat, and I feel strong.  Core.",
+      "expect": {
+        "kind": "plan",
+        "notes": "'Bother' about a warm up is not a symptom."
+      }
+    },
+    {
+      "id": "k03_negated_off",
+      "category": "control",
+      "input": "My knee does not feel off at all today.  20 minutes, no equipment, legs.",
+      "expect": {
+        "kind": "plan",
+        "notes": "A negated vague word does not fire."
+      }
+    }
+  ]
+}
