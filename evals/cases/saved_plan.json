@@ -1,0 +1,52 @@
+{
+  "owner": "Valerie",
+  "status": "Written 2026-10-16 before any code, so the bar cannot move to fit a result.  Do not change an expectation after seeing an answer.  Build Time (Learn 08): one new capability, plus a checkpoint for the irreversible part.",
+  "description": "Set F:  save the plan and swap one exercise in a LATER session.  Irreversible part:  saving replaces the previous saved plan.  Bar (all model-free unless stated):  (1) the file changes only after the exact answer 'yes' (any case, spaces trimmed):  0 writes in 20 attempts that answer anything else, press Enter, hit end of input, interrupt, or run with no terminal; (2) write() refuses with no approval, with an approval for different content, and with a hand-made approval:  0 writes; (3) a damaged or tampered saved file (not JSON, wrong keys, not a plan, over 4000 characters) loads as 'no saved plan' with no crash; (4) the model has no path to the write:  its two tools are unchanged and agent.py and harness.py do not import saved_plan; (5) in a swap session the saved plan's own safety line does not fire the hand-off, the minutes come from the saved plan, and stated equipment and focus are not marked '(assumed)'; (6) LIVE:  the 3 cases below each give a plan that passes every output check and differs from the saved plan in exactly one exercise (expect.changed = 1, counted by code), 3 of 3; (7) all unit tests pass.  The runner passes saved_plan and saved_at to the agent for these cases.",
+  "cases": [
+    {
+      "id": "s01_swap_first",
+      "label": "Swap the first exercise",
+      "saved_plan": "HomeSet plan: 20 min, nothing, full body (assumed)\n1. Bodyweight Squat HD (bodyweight): 3 sets x 10 reps, rest 45 s\n2. Push-Up (bodyweight): 3 sets x 8 reps, rest 45 s\n3. Bird Dog (bodyweight): 3 sets x 10 reps, rest 45 s\n4. Single Leg Glute Bridge (bodyweight): 3 sets x 10 reps, rest 45 s\n5. Arm Raises (T/Y/I) (bodyweight): 3 sets x 10 reps, rest 45 s\nTotal time: 20.4 min (calculated)\nStop if anything hurts. For pain or injury, see a doctor or physical therapist.",
+      "saved_at": "2026-10-15 09:00 EDT",
+      "input": "Swap the first exercise for something else.",
+      "expect": {
+        "kind": "plan",
+        "changed": 1,
+        "must_not_contain": [
+          "cannot plan workouts"
+        ],
+        "notes": "Exactly one exercise changes; the new name came back from search_exercises; the total stays within 5 minutes of the saved plan's 20."
+      }
+    },
+    {
+      "id": "s02_swap_last",
+      "label": "Replace the last exercise",
+      "saved_plan": "HomeSet plan: 15 min, mat, full body (assumed)\n1. Bodyweight Squat HD (bodyweight): 2 sets x 10 reps, rest 45 s\n2. knee push-ups (bodyweight): 2 sets x 8 reps, rest 45 s\n3. Superman (mat): 2 sets x 10 reps, rest 45 s\n4. Crunches (mat): 2 sets x 10 reps, rest 45 s\n5. Hip Raise, Lying (bodyweight): 2 sets x 10 reps, rest 45 s\nTotal time: 14.3 min (calculated)\nStop if anything hurts.  For pain or injury, see a doctor or physical therapist.",
+      "saved_at": "2026-10-15 09:00 EDT",
+      "input": "Replace the last exercise with a different one.",
+      "expect": {
+        "kind": "plan",
+        "changed": 1,
+        "must_not_contain": [
+          "cannot plan workouts"
+        ],
+        "notes": "Exactly one exercise changes; equipment line (mat) is kept; no '(assumed)' on the mat."
+      }
+    },
+    {
+      "id": "s03_swap_second",
+      "label": "Swap the second exercise",
+      "saved_plan": "HomeSet plan: 20 min, nothing, full body (assumed)\n1. Bodyweight Squat HD (bodyweight): 3 sets x 10 reps, rest 45 s\n2. Push-Up (bodyweight): 3 sets x 8 reps, rest 45 s\n3. Bird Dog (bodyweight): 3 sets x 10 reps, rest 45 s\n4. Single Leg Glute Bridge (bodyweight): 3 sets x 10 reps, rest 45 s\n5. Arm Raises (T/Y/I) (bodyweight): 3 sets x 10 reps, rest 45 s\nTotal time: 20.4 min (calculated)\nStop if anything hurts. For pain or injury, see a doctor or physical therapist.",
+      "saved_at": "2026-10-15 09:00 EDT",
+      "input": "Swap the second exercise for a different one.",
+      "expect": {
+        "kind": "plan",
+        "changed": 1,
+        "must_not_contain": [
+          "cannot plan workouts"
+        ],
+        "notes": "Exactly one exercise changes; the other four keep their order."
+      }
+    }
+  ]
+}
