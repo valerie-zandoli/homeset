@@ -11,7 +11,7 @@ HomeSet is a single-role AI agent built by Valerie Zandoli and Yadan Taino for P
 - **Data:**  the free [wger](https://wger.de/en/software/api) exercise database (read-only)
 - **Pitch:**  `docs/pitch-script.md` (the design pitch for 2026-10-19, with timing and the cut order)
 
-## Status (2026-10-14)
+## Status (updated 2026-10-16)
 
 | Part | State |
 |---|---|
@@ -48,6 +48,9 @@ cp .env.example .env        # then put your personal API key in .env
 python -m pytest                                   # no key or network needed
 python -m homeset "I have 20 minutes, a mat, and dumbbells.  Work on legs."
 python -m homeset --mock "I have 20 minutes and dumbbells.  Chest."   # canned wger data
+python -m homeset "I have 15 minutes and a mat.  Legs." --save         # offers to save the plan;  only "yes" at a terminal saves;  needs the key
+python -m homeset "Swap the first exercise." --saved [--save]        # starts from the saved plan;  needs the key
+python scripts/try_checkpoint.py                                    # feel the save checkpoint;  no key, no network
 python evals/run_evals.py evals/cases/eval_card.json                  # needs the key
 python evals/run_evals.py evals/cases/eval_card.json --only case3_adversarial
 python evals/run_evals.py evals/cases/multi_turn.json                 # conversations; needs the key
