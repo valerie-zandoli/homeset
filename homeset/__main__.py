@@ -2,12 +2,19 @@
 
 Add --mock to use canned wger data instead of the network (the model call still needs
 the API key in .env).  Add --trace to print the step-by-step trace of the request.
+
+Save and swap (Build Time, Learn 08):
+    python -m homeset "I have 20 minutes and a mat.  Legs." --save
+        After a plan, shows it next to the saved plan and asks once;  only the answer "yes" saves.
+    python -m homeset "Swap the first exercise for something else." --saved [--save]
+        Starts from the saved plan (read-only, automatic);  add --save to offer saving the swap.
 """
 
 from __future__ import annotations
 
 import sys
 
+from . import saved_plan
 from .agent import run_once
 from .trace import format_trace
 
@@ -23,7 +30,17 @@ def main(argv: list[str]) -> int:
 
         search_fn = mock_search
         print("[MOCK DATA: canned wger results]\n")
-    outcome = run_once(" ".join(args), search_fn)
+    path = saved_plan.default_path()
+    earlier = None
+    if "--saved" in argv:
+        earlier = saved_plan.load(path)
+        if earlier is None:
+            print(saved_plan.NO_SAVED_PLAN)
+            return 1
+    if earlier:
+        outcome = run_once(" ".join(args), search_fn, earlier.plan, earlier.saved_at)
+    else:
+        outcome = run_once(" ".join(args), search_fn)
     print(f"[{outcome.kind}]\n")
     print(outcome.text)
     for failure in outcome.failures:
@@ -31,6 +48,12 @@ def main(argv: list[str]) -> int:
     if "--trace" in argv:
         print("\n--- trace ---")
         print(format_trace(outcome.trace))
+    if "--save" in argv:  # the checkpoint:  only a human's "yes" writes (homeset/saved_plan.py)
+        print()
+        if outcome.kind == "plan":
+            saved_plan.offer_save(outcome.text, path)
+        else:
+            print("Not saved:  only a plan can be saved.")
     return 0
 
 

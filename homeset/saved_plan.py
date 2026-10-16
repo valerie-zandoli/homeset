@@ -157,7 +157,7 @@ def review_text(proposal: Proposal) -> str:
 def offer_save(
     plan_text: str,
     path: Path | None = None,
-    ask: Callable[[str], str] = input,
+    ask: Callable[[str], str] | None = None,
     interactive: bool | None = None,
     out: Callable[[str], None] = print,
 ) -> bool:
@@ -166,6 +166,7 @@ def offer_save(
     With no terminal to answer in (a script, a pipe), nothing is written:  silence is never consent.
     """
     path = path or default_path()
+    ask = ask or input  # looked up now, not when the module loads
     try:
         proposal = propose(plan_text, path)
     except ValueError:

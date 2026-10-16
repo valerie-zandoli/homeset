@@ -70,8 +70,12 @@ def build_agent(state: RequestState, search_fn=None):
     )
 
 
-def run_once(user_message: str, search_fn=None) -> Outcome:
+def run_once(user_message: str, search_fn=None, earlier_plan: str | None = None, earlier_plan_at: str = "") -> Outcome:
+    """One request.  `earlier_plan` is a plan saved in an earlier session (a swap session); it is
+    plain text here, and this module never touches the file or the save step."""
     state = RequestState(user_message=user_message)
+    if earlier_plan:
+        state.attach_earlier_plan(earlier_plan, earlier_plan_at)
     agent = build_agent(state, search_fn)
     return handle_request(user_message, lambda text: str(agent(text)), state)
 

@@ -102,3 +102,19 @@ def mark_assumed(plan_text: str, user_text: str) -> str:
         focus = f"{focus} {MARKER}"
     lines[index] = f"{prefix}{equipment}, {focus}"
     return "\n".join(lines)
+
+
+def stated_in_plan(plan_text: str) -> str:
+    """The equipment and focus words on line 1 that carry no "(assumed)" marker.
+
+    A saved plan's unmarked fields were stated by the user in the session that made it, so a
+    later swap session must not mark them "(assumed)" just because the swap request names neither.
+    """
+    for line in plan_text.split("\n"):
+        if line.strip():
+            match = _LINE1.match(line.strip())
+            if not match:
+                return ""
+            _prefix, equipment, focus = match.groups()
+            return " ".join(field for field in (equipment, focus) if MARKER not in field)
+    return ""

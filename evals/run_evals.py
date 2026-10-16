@@ -28,6 +28,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
 from homeset.agent import run_conversation, run_once  # noqa: E402
+from homeset.checks import parse_plan  # noqa: E402
 from homeset.harness import RequestState, handle_request  # noqa: E402
 from homeset.mock_wger import mock_get, mock_search  # noqa: E402
 from homeset.trace import trace_fields  # noqa: E402
@@ -103,6 +104,17 @@ def meets(outcome, expect: dict) -> bool:
     return ok
 
 
+def changed_exercises(old_plan: str, new_plan: str) -> int | None:
+    """How many exercise lines differ between two plans (by position, then by length), or None when
+    either text does not parse.  A swap should change exactly one."""
+    try:
+        old = [ex["name"].lower() for ex in parse_plan(old_plan, []).exercises]
+        new = [ex["name"].lower() for ex in parse_plan(new_plan, []).exercises]
+    except ValueError:
+        return None
+    return sum(1 for a, b in zip(old, new) if a != b) + abs(len(old) - len(new))
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("cases_file")
@@ -136,13 +148,19 @@ def main() -> int:
             continue
         if "scripted_reply" in case:  # model-free case:  the reply is fixed and the harness is real
             outcome = handle_request(case["input"], lambda _text: case["scripted_reply"], RequestState(case["input"]))
+        elif "saved_plan" in case:  # a swap session:  start from a plan saved in an earlier session
+            outcome = run_once(case["input"], search, case["saved_plan"], case.get("saved_at", ""))
         else:
             outcome = run_once(case["input"], search)
         ok = meets(outcome, case["expect"])
+        extra = {}
+        if "changed" in case["expect"] and "saved_plan" in case:  # counted by code, not by a reader
+            extra["changed_exercises"] = changed_exercises(case["saved_plan"], outcome.text) if outcome.kind == "plan" else None
+            ok = ok and extra["changed_exercises"] == case["expect"]["changed"]
         passed += ok
         rows.append({"id": case["id"], "expected_kind": case["expect"]["kind"], "kind": outcome.kind, "pass": ok,
                      "failures": outcome.failures, "tool_errors": outcome.tool_errors, "text": outcome.text,
-                     **trace_fields(outcome)})
+                     **extra, **trace_fields(outcome)})
         print(f"{'PASS' if ok else 'FAIL'}  {case['id']}  expected={case['expect']['kind']}  got={outcome.kind}")
     print(f"\n{passed} of {len(cases)} matched the expected kind.  Read the saved run to grade the notes.")
     out_dir = ROOT / "runs"
