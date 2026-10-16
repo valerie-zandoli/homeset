@@ -26,6 +26,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import re
 import sys
 import tempfile
 import time
@@ -37,6 +38,8 @@ from .checks import SAFETY_LINE, classify, parse_plan
 
 ROOT = Path(__file__).resolve().parents[1]
 MAX_PLAN_CHARS = 4000
+MAX_FILE_BYTES = 32768  # a plan is at most 4000 characters;  a larger file is never read
+_SAVED_AT = re.compile(r"^\d{4}-\d{2}-\d{2} \d{2}:\d{2}(?: [A-Za-z ]{2,30})?$")  # a date and time, nothing else
 NO_SAVED_PLAN = "I do not have a saved plan yet.  Make a plan and save it first."
 ASK = "Replace the saved plan with the new one?  Type yes to save: "
 _MINT = object()  # only confirm() holds this
@@ -72,15 +75,24 @@ def load(path: Path | None = None) -> Saved | None:
     """The saved plan, or None when there is none or the file is damaged or not a plan."""
     path = path or default_path()
     try:
+        if path.stat().st_size > MAX_FILE_BYTES:
+            return None
         data = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, ValueError):
         return None
     if not isinstance(data, dict) or set(data) != {"plan", "saved_at"}:
         return None
     plan, saved_at = data["plan"], data["saved_at"]
-    if not _is_plan(plan) or not isinstance(saved_at, str) or not 0 < len(saved_at) <= 40:
+    # saved_at goes into the model's prompt, so it must be a date and time and nothing else.
+    if not _is_plan(plan) or not isinstance(saved_at, str) or not _SAVED_AT.match(saved_at):
         return None
     return Saved(plan.strip(), saved_at)
+
+
+def _stamp() -> str:
+    """The time of a save, in the one form load() accepts."""
+    stamp = time.strftime("%Y-%m-%d %H:%M %Z").strip()
+    return stamp if _SAVED_AT.match(stamp) else time.strftime("%Y-%m-%d %H:%M")
 
 
 def _digest(text: str) -> str:
@@ -132,7 +144,7 @@ def write(proposal: Proposal, approval: object, path: Path | None = None) -> Sav
         raise PermissionError("the confirmation was for different text")
     if not _is_plan(proposal.new_plan):
         raise ValueError("only a complete, valid HomeSet plan can be saved")
-    saved = Saved(proposal.new_plan, time.strftime("%Y-%m-%d %H:%M %Z"))
+    saved = Saved(proposal.new_plan, _stamp())
     path.parent.mkdir(parents=True, exist_ok=True)
     fd, tmp_name = tempfile.mkstemp(dir=path.parent, prefix=".saved_plan.", suffix=".tmp")
     try:
