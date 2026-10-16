@@ -19,10 +19,19 @@ from .agent import run_once
 from .trace import format_trace
 
 
+USAGE = 'usage: python -m homeset "your request" [--mock] [--trace] [--save] [--saved]'
+FLAGS = {"--mock", "--trace", "--save", "--saved"}
+
+
 def main(argv: list[str]) -> int:
+    unknown = [a for a in argv if a.startswith("--") and a not in FLAGS]
+    if unknown:  # a misspelled --save would otherwise run as a normal request with no checkpoint
+        print(f"Unknown option: {' '.join(unknown)}")
+        print(USAGE)
+        return 2
     args = [a for a in argv if not a.startswith("--")]
     if not args:
-        print('usage: python -m homeset "your request" [--mock] [--trace]')
+        print(USAGE)
         return 2
     search_fn = None
     if "--mock" in argv:
