@@ -16,6 +16,7 @@ harness has to recognize them.  A fixed opening sentence makes that a string mat
 | 5 | minutes missing | How many minutes do you have? | question |
 | 6 | no label fits the user's words | I am not sure which \<focus or equipment\> you mean.  Which of these fits best: \<the closest labels\>? | question |
 | 7 | pain, injury, surgery, pregnancy, or a medical condition | I cannot plan workouts around pain, injuries, or medical conditions.  Please talk to a doctor or physical therapist first. | handoff (unchanged from the PRD) |
+| 8 | vague symptom wording ("feels off", "bothering me", "twinge"); fired by code, no model call | Is that ordinary soreness or tiredness, or does it hurt? | question |
 
 Decisions this needs from you:
 
