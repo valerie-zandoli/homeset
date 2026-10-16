@@ -244,4 +244,4 @@ def test_the_model_side_modules_never_import_the_write(module):
 
 def test_the_default_path_is_outside_version_control():
     gitignore = (Path(saved_plan.ROOT) / ".gitignore").read_text().split()
-    assert "saved_plan.json" in gitignore
+    assert "/saved_plan.json" in gitignore  # root only:  evals/cases/saved_plan.json is a tracked case file

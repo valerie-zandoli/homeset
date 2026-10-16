@@ -5,5 +5,5 @@ __pycache__/
 .pytest_cache/
 # Run logs from live model calls can contain request text; keep them out unless chosen
 runs/
-saved_plan.json
+/saved_plan.json
 .saved_plan.*.tmp
