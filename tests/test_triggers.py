@@ -108,8 +108,10 @@ def test_a_clearance_claim_in_a_later_turn_does_not_undo_the_trigger():
     assert outcome.kind == "handoff" and outcome.reason == "surgery"
 
 
-def test_an_ambiguous_message_still_reaches_the_model():
-    state = RequestState("My lower back feels a little off today.  20 minutes, mat, full body.")
+def test_wording_that_neither_list_knows_still_reaches_the_model():
+    # "feels a little off" now gets the code-fired question (tests/test_vague.py); the prompt's
+    # step 1 stays as the second layer for wording that neither word list holds.
+    state = RequestState("My lower back is acting up a bit today.  20 minutes, mat, full body.")
     calls = []
 
     def model(text):

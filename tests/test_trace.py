@@ -183,11 +183,11 @@ def test_a_plan_that_passes_leaves_every_step_in_order():
     outcome = handle_request(state.user_message, asking(state, GOOD_PLAN), state)
     assert outcome.kind == "plan" and outcome.retry_fired is False
     assert names(outcome) == [
-        "request", "trigger", "model_call", "tool_call", "tool_result", "model_reply", "assumed", "checks", "outcome",
+        "request", "trigger", "vague", "model_call", "tool_call", "tool_result", "model_reply", "assumed", "checks", "outcome",
     ]
     by_name = {e["event"]: e for e in outcome.trace}
     assert by_name["request"]["minutes_requested"] == 3
-    assert by_name["trigger"]["fired"] is False
+    assert by_name["trigger"]["fired"] is False and by_name["vague"]["fired"] is False
     assert by_name["model_call"]["prompt"] == state.user_message and by_name["model_call"]["attempt"] == 0
     assert by_name["model_reply"]["kind"] == "plan"
     assert by_name["assumed"] == {**by_name["assumed"], "model_wrote_marker": False, "code_changed_line_1": False}

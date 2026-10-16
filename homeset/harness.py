@@ -24,7 +24,8 @@ from typing import Callable
 
 from .assumed import MARKER, mark_assumed
 from .checks import HANDOFF_SENTENCE, check_plan, check_results, classify
-from .triggers import find_trigger
+from .messages import VAGUE_QUESTION
+from .triggers import find_trigger, find_vague
 from .labels import UnknownLabel
 from .plan_time import calculate_plan_time
 from .trace import Trace, clip
@@ -56,6 +57,8 @@ class RequestState:
     tool_errors: list[str] = field(default_factory=list)  # fixed-wording reasons, for the run log
     trace: Trace = field(default_factory=Trace)  # step-by-step record of this request (homeset/trace.py)
     retry_fired: bool = False  # True when the one regeneration was used
+    vague_asked: bool = False  # code already asked the fixed clarifying question in this conversation
+    clarifying_for: str | None = None  # the request that question was about, until the answer turn uses it
 
     def __post_init__(self) -> None:
         if self.requested_minutes is None:
@@ -91,7 +94,7 @@ class Outcome:
     kind: str  # 'plan' | 'handoff' | 'question' | 'error'
     text: str
     failures: list[str] = field(default_factory=list)
-    reason: str = ""  # for a hand-off fired by code:  the trigger word that fired
+    reason: str = ""  # for a hand-off or question fired by code:  the word or phrase that fired
     tool_errors: list[str] = field(default_factory=list)  # why a tool failed, whatever the model then wrote
     retry_fired: bool = False  # the one regeneration was used
     trace: list[dict] = field(default_factory=list)  # every step of the request, in order (homeset/trace.py)
@@ -238,8 +241,10 @@ def handle_request(user_message: str, ask_model: Callable[[str], str], state: Re
 
     Clear safety triggers (pain, injury, surgery, pregnancy, a medical condition) are
     checked first, in code, over the whole conversation:  the exact hand-off sentence goes
-    to the user and the model is never called.  The prompt's step 1 still handles the
-    ambiguous cases and is the second layer behind this check.
+    to the user and the model is never called.  Vague wording ("feels off", "bothering me")
+    gets the one fixed clarifying question the same way; a second vague message after that
+    question is handed off.  The prompt's step 1 is the second layer for wording that
+    neither list knows.
 
     Every outcome carries the reasons any tool failed during the request, so a saved run
     shows why the user saw "could not reach" (HTTP 503, an unreadable response, a deadline).
@@ -264,13 +269,35 @@ def _ask(ask_model: Callable[[str], str], state: RequestState, prompt: str, atte
     return text
 
 
+def _with_earlier_request(earlier: str, answer: str) -> str:
+    """The model's prompt for the turn that answers the code-fired question."""
+    return (
+        f"Earlier request: {earlier}\n"
+        f"You asked: {VAGUE_QUESTION}\n"
+        f"The user answered: {answer}\n"
+        "Follow the safety rule in step 1, then plan the earlier request."
+    )
+
+
 def _run_request(user_message: str, ask_model: Callable[[str], str], state: RequestState) -> Outcome:
     state.trace.add("request", message=clip(user_message), minutes_requested=state.requested_minutes)
     trigger = find_trigger(state.conversation_text or user_message)
     state.trace.add("trigger", fired=trigger is not None, word=trigger)
     if trigger:  # the model is never called
         return Outcome("handoff", HANDOFF_SENTENCE, reason=trigger)
-    text = _ask(ask_model, state, user_message, 0)
+    vague = find_vague(user_message)  # the latest message only:  an answer to our question must not re-fire
+    state.trace.add("vague", fired=vague is not None, phrase=vague, asked_before=state.vague_asked)
+    if vague and state.vague_asked:  # still vague after the question:  err toward the hand-off
+        return Outcome("handoff", HANDOFF_SENTENCE, reason=f"vague again: {vague}")
+    if vague:  # the model is never called
+        state.vague_asked = True
+        state.clarifying_for = user_message
+        return Outcome("question", VAGUE_QUESTION, reason=vague)
+    prompt = user_message
+    if state.clarifying_for:  # the model never saw the earlier request, so pass it along with the answer
+        prompt = _with_earlier_request(state.clarifying_for, user_message)
+        state.clarifying_for = None
+    text = _ask(ask_model, state, prompt, 0)
     for attempt in range(MAX_REGENERATIONS + 1):
         if state.budget_exceeded:
             state.trace.add("budget_exceeded", attempt=attempt)
