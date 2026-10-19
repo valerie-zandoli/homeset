@@ -26,7 +26,7 @@ HomeSet is a workout planner for the at-home fitness industry.  Its user is a bu
 
 ## Status (checked 2026-10-19)
 
-Checked against the code and the live wger service on 2026-10-19:  501 tests pass; the live canary passed 12 of 12 focus labels; the text scan read 932 of 932 English names, dropped 0, and raised 0 alarms.  Dated live model results below are history, not re-run today.
+Checked against the code and the live wger service on 2026-10-19:  506 tests pass; the live canary passed 12 of 12 focus labels; the text scan read 932 of 932 English names, dropped 0, and raised 0 alarms.  Dated live model results below are history, not re-run today.
 
 | Part | State |
 |---|---|
