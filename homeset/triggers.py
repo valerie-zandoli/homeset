@@ -59,11 +59,20 @@ def _tokens(text: str) -> list[str]:
     return re.sub(r"[^a-z0-9' ]", " ", lowered).split()
 
 
+def _nothing_negates(tokens: list[str], start: int) -> bool:
+    """"Nothing hurts" and "nothing is painful" deny the symptom.  "Nothing" negates only when it sits right
+    before the word (or before is/feels/seems/was + the word);  further away it can mean "nothing helps my
+    pain", and a missed trigger is the unsafe direction."""
+    if start >= 1 and tokens[start - 1] == "nothing":
+        return True
+    return start >= 2 and tokens[start - 2] == "nothing" and tokens[start - 1] in {"is", "feels", "feel", "seems", "was"}
+
+
 def _negated(tokens: list[str], start: int, end: int) -> bool:
-    """True when a negator sits in the 3 words before the match, or "free" follows it."""
+    """True when a negator sits in the 3 words before the match, "free" follows it, or "nothing" negates it."""
     before = tokens[max(0, start - 3):start]
     after = tokens[end:end + 1]
-    return any(t in _NEGATORS for t in before) or after == ["free"]
+    return any(t in _NEGATORS for t in before) or after == ["free"] or _nothing_negates(tokens, start)
 
 
 # Vague wording that might be a symptom:  not a clear trigger, so code asks one fixed question

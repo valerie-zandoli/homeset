@@ -120,3 +120,28 @@ def test_wording_that_neither_list_knows_still_reaches_the_model():
 
     outcome = handle_request(state.user_message, model, state)
     assert calls and outcome.kind == "question"
+
+
+# --- "nothing" as a negator (found by the negated-symptom baseline of 2026-10-18:  "Nothing hurts today" was handed off) ---
+
+
+@pytest.mark.parametrize(
+    "text",
+    ["Nothing hurts today and I feel strong.", "nothing is painful", "Nothing feels painful at all.", "Nothing hurt after the last session."],
+)
+def test_nothing_before_the_word_denies_the_symptom(text):
+    assert find_trigger(text) is None
+
+
+@pytest.mark.parametrize(
+    "text,word",
+    [
+        ("Nothing helps my pain.", "pain"),  # "nothing" is three words away:  a symptom, not a denial
+        ("Nothing but pain in my knee.", "pain"),
+        ("I do nothing when my knee hurts.", "hurts"),
+        ("Nothing, my knee hurts.", "hurts"),
+        ("Nothing works and my back is painful.", "painful"),
+    ],
+)
+def test_nothing_further_away_does_not_hide_a_symptom(text, word):
+    assert find_trigger(text) == word
