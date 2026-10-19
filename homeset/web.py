@@ -4,6 +4,10 @@ A local web page in front of the same agent the command line runs.  It changes h
 looks, not what the agent may do:  every request goes through agent.run_once(), so the
 safety triggers, the tool limits, the "(assumed)" marker, and every output check still apply.
 
+The self-playing showcase for the start of a presentation is at /showcase (it makes no
+agent calls; its plans are real saved outputs).  It also opens straight from the file:
+homeset/showcase.html.
+
 Add --mock to use canned wger data (the model call still needs the API key in .env), and
 --port N to change the port.
 
@@ -40,6 +44,7 @@ MAX_BODY_BYTES = 16384
 MAX_MESSAGE_CHARS = 500
 SWAP_REQUEST = "Swap the first exercise for something else."
 PAGE = Path(__file__).with_name("web_page.html")
+SHOWCASE = Path(__file__).with_name("showcase.html")  # self-playing opener for presentations; no agent calls
 _LOCAL_HOSTS = {"127.0.0.1", "localhost"}
 
 
@@ -165,9 +170,11 @@ def make_handler(app: App, port: int):
         def do_GET(self):
             if not _host_ok(self.headers.get("Host"), port):
                 return self._json(403, {"error": "forbidden host"})
-            if self.path.split("?")[0] != "/":
+            pages = {"/": PAGE, "/showcase": SHOWCASE}
+            page = pages.get(self.path.split("?")[0])
+            if page is None:
                 return self._json(404, {"error": "not found"})
-            self._send(200, PAGE.read_bytes(), "text/html; charset=utf-8")
+            self._send(200, page.read_bytes(), "text/html; charset=utf-8")
 
         def do_POST(self):
             if not _host_ok(self.headers.get("Host"), port) or not _origin_ok(self.headers.get("Origin"), port):

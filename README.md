@@ -88,6 +88,7 @@ python -m homeset "I have 15 minutes and a mat.  Legs." --save         # offers 
 python -m homeset "Swap the first exercise." --saved [--save]        # starts from the saved plan;  needs the key
 python scripts/try_checkpoint.py                                    # feel the save checkpoint;  no key, no network
 python -m homeset.web                                               # chat page at http://127.0.0.1:8000 (this computer only);  same agent and checks;  needs the key
+open homeset/showcase.html                                          # self-playing opener for the presentation (also at /showcase);  no key, no agent calls
 python evals/run_evals.py evals/cases/eval_card.json                  # needs the key
 python evals/run_evals.py evals/cases/eval_card.json --only case3_adversarial
 python evals/run_evals.py evals/cases/multi_turn.json                 # conversations; needs the key
