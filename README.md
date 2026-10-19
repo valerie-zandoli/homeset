@@ -10,6 +10,7 @@ HomeSet is a single-role AI agent built by Valerie Zandoli and Yadan Taino for P
 - **Design:**  `docs/architecture-v3.png` (detailed) and `docs/architecture-v1.png` (simple)
 - **Data:**  the free [wger](https://wger.de/en/software/api) exercise database (read-only)
 - **Pitch:**  `docs/pitch-script.md` (the design pitch for 2026-10-19, with timing and the cut order)
+- **Access:**  `docs/access-register.md` (every grant, the job step that needs it, where each limit is enforced in code, and the open gaps)
 
 ## Status (updated 2026-10-16)
 
