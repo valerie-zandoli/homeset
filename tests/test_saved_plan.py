@@ -100,6 +100,50 @@ def test_the_time_we_write_always_loads_even_if_the_clock_name_is_odd(path, monk
     assert load(path) is not None and saved_plan.re.match(r"^\d{4}-\d{2}-\d{2} \d{2}:\d{2}$", load(path).saved_at)
 
 
+# --- access control:  the saved plan belongs to the user who runs HomeSet --------------------------------
+
+
+@pytest.mark.parametrize("mode", [0o600, 0o640, 0o644, 0o400])
+def test_a_file_only_its_owner_can_change_loads(path, mode):
+    save_first(path, PLAN_A)
+    path.chmod(mode)
+    assert load(path) is not None and saved_plan.ignored_reason(path) is None
+
+
+@pytest.mark.parametrize("mode", [0o620, 0o660, 0o664, 0o602, 0o606, 0o666])
+def test_a_file_that_group_or_others_can_change_is_ignored_with_a_reason(path, mode):
+    save_first(path, PLAN_A)
+    path.chmod(mode)
+    assert load(path) is None
+    assert "other users can change it" in saved_plan.ignored_reason(path)
+
+
+def test_a_file_owned_by_another_user_is_ignored(path, monkeypatch):
+    save_first(path, PLAN_A)
+    monkeypatch.setattr(os, "getuid", lambda: os.stat(path).st_uid + 1)
+    assert load(path) is None and "another user owns it" in saved_plan.ignored_reason(path)
+
+
+def test_a_link_to_a_valid_saved_file_is_not_trusted(tmp_path):
+    real = tmp_path / "real.json"
+    save_first(real, PLAN_A)
+    link = tmp_path / "saved_plan.json"
+    link.symlink_to(real)
+    assert load(link) is None and "not a plain file" in saved_plan.ignored_reason(link)
+
+
+def test_no_file_has_no_reason_to_ignore_it(path):
+    assert saved_plan.ignored_reason(path) is None
+
+
+def test_a_save_over_an_ignored_file_makes_it_trusted_again(path):
+    save_first(path, PLAN_A)
+    path.chmod(0o666)
+    assert load(path) is None
+    save_first(path, PLAN_B)  # the checkpoint writes a fresh owner-only file
+    assert stat.S_IMODE(path.stat().st_mode) == 0o600 and load(path).plan == PLAN_B.strip()
+
+
 def test_a_directory_in_place_of_the_file_is_not_a_crash(path):
     path.mkdir()
     assert load(path) is None

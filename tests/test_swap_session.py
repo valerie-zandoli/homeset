@@ -125,6 +125,16 @@ def test_saved_with_no_saved_plan_stops_before_the_model(home, monkeypatch, caps
     assert calls == [] and saved_plan.NO_SAVED_PLAN in capsys.readouterr().out
 
 
+def test_saved_says_why_when_the_file_is_ignored(home, monkeypatch, capsys):
+    proposal = saved_plan.propose(D1, home)
+    saved_plan.write(proposal, saved_plan.confirm(proposal, "yes"), home)
+    home.chmod(0o666)
+    monkeypatch.setattr(cli, "run_once", fake_run_once([], Outcome("plan", D1)))
+    assert cli.main(["Swap the first exercise.", "--saved"]) == 1
+    out = capsys.readouterr().out
+    assert "other users can change it" in out and saved_plan.NO_SAVED_PLAN in out
+
+
 def test_saved_passes_the_plan_and_its_time_to_the_agent(home, monkeypatch, capsys):
     proposal = saved_plan.propose(D1, home)
     saved_plan.write(proposal, saved_plan.confirm(proposal, "yes"), home)

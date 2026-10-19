@@ -17,6 +17,7 @@ line in __main__.py calls offer_save(), after the human asks for --save.
 The file holds the plan text and the time it was saved, nothing else:  no symptoms, no request
 text.  It stays out of git (.gitignore) and is written with owner-only permissions.  A file that
 is damaged or edited into something that is not a plan loads as "no saved plan".
+A file that is a link, belongs to another user, or can be changed by other users is ignored too (ignored_reason).
 
 This module has no model or network code.
 """
@@ -27,6 +28,7 @@ import hashlib
 import json
 import os
 import re
+import stat
 import sys
 import tempfile
 import time
@@ -71,11 +73,32 @@ def _is_plan(text: object) -> bool:
     return " ".join(last.split()) == " ".join(SAFETY_LINE.split())
 
 
+def ignored_reason(path: Path | None = None) -> str | None:
+    """Why an existing saved file is ignored on access grounds, or None when it is fine or absent.
+
+    Access control for version 1 (no accounts, no roles):  the saved plan belongs to the operating-system
+    user who runs HomeSet.  The file must be a regular file (not a symlink), owned by that user, and not
+    writable by the group or by others;  anything else could have been changed by someone else.
+    """
+    path = path or default_path()
+    try:
+        info = path.lstat()
+    except OSError:
+        return None
+    if not stat.S_ISREG(info.st_mode):
+        return "I ignored the saved plan file because it is not a plain file (a link or a folder is not trusted)."
+    if hasattr(os, "getuid") and info.st_uid != os.getuid():
+        return "I ignored the saved plan file because another user owns it."
+    if info.st_mode & 0o022:
+        return "I ignored the saved plan file because other users can change it.  Run chmod 600 on it to trust it again."
+    return None
+
+
 def load(path: Path | None = None) -> Saved | None:
     """The saved plan, or None when there is none or the file is damaged or not a plan."""
     path = path or default_path()
     try:
-        if path.stat().st_size > MAX_FILE_BYTES:
+        if ignored_reason(path) or path.lstat().st_size > MAX_FILE_BYTES:
             return None
         data = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, ValueError):

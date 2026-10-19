@@ -44,6 +44,8 @@ def main(argv: list[str]) -> int:
     if "--saved" in argv:
         earlier = saved_plan.load(path)
         if earlier is None:
+            reason = saved_plan.ignored_reason(path)
+            print(f"{reason}\n" if reason else "", end="")
             print(saved_plan.NO_SAVED_PLAN)
             return 1
     if earlier:
