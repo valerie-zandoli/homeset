@@ -20,13 +20,13 @@ HomeSet is a workout planner for the at-home fitness industry.  Its user is a bu
 
 - **Medical advice.**  HomeSet never diagnoses, treats, or trains through pain.  Pain, injury, surgery, pregnancy, or a medical condition gets one fixed hand-off sentence from code, and no plan.
 - **Timed moves**, such as planks.  wger does not mark which exercises are timed, so every exercise is counted by reps.
-- **Accounts, sign-in, and a separate approver role.**  The person at the terminal is the user and the approver (version 2).
+- **Accounts, sign-in, and a separate approver role.**  The person at the terminal, or at the chat page on this computer, is the user and the approver (version 2).
 - **Any model tool beyond two.**  The model can search wger and add up time; it has no email, calendar, file, shell, or web access (`docs/access-register.md`).
-- **Workout history.**  HomeSet keeps one saved plan, replaced only by a typed "yes".
+- **Workout history.**  HomeSet keeps one saved plan, replaced only by a typed "yes" at a terminal or a click on "Yes, save" on the chat page.
 
 ## Status (checked 2026-10-19)
 
-Checked against the code and the live wger service on 2026-10-19:  506 tests pass; the live canary passed 12 of 12 focus labels; the text scan read 932 of 932 English names, dropped 0, and raised 0 alarms.  Dated live model results below are history, not re-run today.
+Checked against the code and the live wger service on 2026-10-19:  546 tests pass; the live canary passed 12 of 12 focus labels; the text scan read 932 of 932 English names, dropped 0, and raised 0 alarms.  Dated live model results below are history, not re-run today.
 
 | Part | State |
 |---|---|
@@ -46,8 +46,9 @@ Checked against the code and the live wger service on 2026-10-19:  506 tests pas
 | Request trace (`homeset/trace.py`, `scripts/show_trace.py`) | Added 2026-10-15 for the Agent Traces lesson, so a miss can be read as model reasoning or harness behavior.  Each request records, in order:  the user message and requested minutes; whether the code safety trigger fired (the model is then never called); every model call with its prompt and the reply as the harness read it; every tool call with the arguments the model sent; the funnel of counts per wger filter (count, examined, skipped names, blocked advanced moves, dropped for gear or as duplicates, shown) and the names the model was shown with each one's equipment ids (so a name that disagrees with its tag is visible); whether code changed line 1 for the "(assumed)" marker and whether the model had written one; pass, fail, or not evaluated for each named check; the retry and its reason; and the outcome.  Every eval run row saves it as `trace` beside `retry_fired`.  Read it with `python scripts/show_trace.py runs/<file>.json <case id>` or `python -m homeset "..." --trace`.  **Not captured:**  the model's own reasoning text between tool calls, the system prompt text, and wger's raw JSON (counts and shown names only); text is clipped at 4,000 characters; runs saved before 2026-10-15 have no trace.  24 model-free tests (`tests/test_trace.py`) |
 | Eval cases | Written: card, edge cases, controls, multi-turn, injection, and regression.  The last three ran live 2026-10-14 and all matched the expected kind (notes not yet graded by two people).  The 20-request set (`requests_20.json`) was reviewed and approved by Valerie on 2026-10-14 and ran live the same day:  20 of 20 matched the expected kind, and every total landed within 5 minutes of the request.  Graded by one reader against the file's seven rules, 9 of 20 pass every rule (the headline score; the harness checks alone score 20 of 20).  The 11 misses fail only the exercise-count range (about 5 minutes per exercise against the 3.5 the ranges assumed), and one of those (a15) also lacks the "(assumed)" marker.  The ranges stay as approved; a second range set will follow the stopwatch trial (Open item 4), which replaces the assumed minutes per exercise with a measured number.  The refusal set (`refusals_5.json`, Yadan's five cases; target 4 hand-offs and 1 clarifying question) ran live 2026-10-14:  5 of 5 matched (4 exact hand-offs, 1 clarifying question); notes not yet graded by two people; see Open item 2.  Notes graded once on 2026-10-14 by Claude, pending Valerie and Yadan (Open item 9). |
 | Code-fired clarifying question (`find_vague` in `homeset/triggers.py`) | Vague wording such as "feels off" gets one fixed question from code before the model is called; 48 tests, no model (`tests/test_vague.py`); live 2026-10-16: 10 of 10 vague inputs got the question with 0 model calls (Open item 11) |
-| Save and swap (`homeset/saved_plan.py`, `--save`, `--saved`) | Saving needs the exact answer "yes" at a terminal and an `Approval` for the same hash; the model has no tool for the write; the file is owner-only and validated on load; 120 tests, no model (`tests/test_saved_plan.py`, `tests/test_swap_session.py`); break-it pass in Open item 13 |
+| Save and swap (`homeset/saved_plan.py`, `--save`, `--saved`) | Saving needs the exact answer "yes" (typed at a terminal, or sent by a click on "Yes, save" on the chat page) and an `Approval` for the same hash; the model has no tool for the write; the file is owner-only and validated on load; 120 tests, no model (`tests/test_saved_plan.py`, `tests/test_swap_session.py`); break-it pass in Open item 13 |
 | Argument caps and tool-list pin (`homeset/harness.py`) | Added 2026-10-19 from the access audit: a list the model sends is refused unless it has at most 20 items, and each equipment item must be a string of at most 60 characters; a test fails if the Agent registers any tool beyond the two; 21 tests in `tests/test_guarantees.py`.  The access register is `docs/access-register.md`. |
+| Chat page (`homeset/web.py`, `homeset/web_page.html`, Yadan, `chat-ui` merged 2026-10-19) | `python -m homeset.web` serves a chat-style page on 127.0.0.1 in front of the same `run_once()`, so the triggers, limits, marker, and output checks all apply; the save checkpoint is a "Yes, save" click, not a typed answer; 38 tests, no model (`tests/test_web.py`).  Live view 2026-10-19 on Valerie's machine:  "15 min, a mat, legs" gave a five-exercise plan card (14.7 minutes) and the checkpoint panel;  the swap button, a "my knee hurts" message, and a real save were not tried on the page.  Known limits:  a program on this computer can post to it with no Origin header, and the page loads fonts from Google.  See `docs/access-register.md`. |
 
 ## Set up
 
@@ -75,7 +76,7 @@ copy .env.example .env      # then put your personal API key in .env
 - Use Python 3.12 (3.9 fails the install).  `py -3.12 --version` shows whether it is installed.
 - Run the save checkpoint in a normal terminal window (Windows Terminal, PowerShell, or Command Prompt, or the integrated terminal in VS Code).  A pane that is not a real terminal prints "Not saved:  no one is here to confirm", which is correct and saves nothing.
 - To keep the demo away from a real saved plan:  `$env:HOMESET_SAVED_PLAN = "$env:TEMP\homeset_demo_plan.json"`, then `Remove-Item $env:HOMESET_SAVED_PLAN -ErrorAction SilentlyContinue`.
-- `python -m pytest` should pass with about 15 skips (the file-owner and permission tests); a run that simulates Windows by hiding `os.getuid` gave 491 passed and 15 skipped on 2026-10-19.
+- `python -m pytest` should pass with about 15 skips (the file-owner and permission tests); a run that simulates Windows by hiding `os.getuid` gave 531 passed and 15 skipped (of 546) on 2026-10-19.
 
 ## Run
 
@@ -119,8 +120,8 @@ output checks (plans only) ----- pass -----> user
     |
     +-- fail: back to the model once; a second failure is a visible error and no plan
 
-save and swap (the command line, outside the model):
-user types "yes" at a terminal -> saved_plan.json -> a later --saved run -> model, once, as data
+save and swap (the command line or the chat page, outside the model):
+user types "yes" at a terminal (or clicks "Yes, save" on the chat page) -> saved_plan.json -> a later --saved run -> model, once, as data
 ```
 
 The same picture with every box and the loops is `docs/architecture-v4.png`.
@@ -159,10 +160,10 @@ From the PRD and the diagram:
 The live demo runs on Valerie's machine, because Yadan has no API key yet (decided 2026-10-19).  Check these there first:
 
 1. `git pull`, then activate `.venv` (Python 3.12).
-2. `python -m pytest`:  expect 506 passed (about 491 passed and 15 skipped on Windows).
+2. `python -m pytest`:  expect 546 passed (about 531 passed and 15 skipped on Windows).
 3. `python scripts/try_checkpoint.py` in a real terminal window:  needs no key;  type `yes`, then `no`.
 4. Point the demo at a scratch saved plan, so the first checkpoint shows "(none)":  `export HOMESET_SAVED_PLAN=/tmp/homeset_demo_plan.json`, then `rm -f /tmp/homeset_demo_plan.json` (Windows steps are under "Set up").
 5. The three demo commands, in order:  `python -m homeset "I have 15 minutes and a mat.  Legs." --save` (type `yes`);  `python -m homeset "Swap the first exercise." --saved`;  `python -m homeset "My knee hurts.  I have 15 minutes and a mat.  Legs." --trace`.  They took 19.3, 12.1, and 1.3 seconds on 2026-10-19.
 6. `python scripts/scan_wger_text.py` and `python scripts/canary_wger.py` (live wger checks).
 
-**Backup on Yadan's machine (no key needed):**  `git pull`, activate `.venv`, `python -m pytest` (506 passed), then `python scripts/try_checkpoint.py` in a real terminal window.  The live demo needs a key in `.env` (never share a key, never commit one).
+**Backup on Yadan's machine (no key needed):**  `git pull`, activate `.venv`, `python -m pytest` (546 passed), then `python scripts/try_checkpoint.py` in a real terminal window.  The live demo needs a key in `.env` (never share a key, never commit one).
