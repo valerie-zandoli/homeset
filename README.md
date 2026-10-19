@@ -26,7 +26,7 @@ HomeSet is a workout planner for the at-home fitness industry.  Its user is a bu
 
 ## Status (checked 2026-10-19)
 
-Checked against the code and the live wger service on 2026-10-19:  630 tests pass; the live canary passed 12 of 12 focus labels; the text scan read 932 of 932 English names, dropped 0, and raised 0 alarms.  Dated live model results below are history, not re-run today.
+Checked against the code and the live wger service on 2026-10-19:  634 tests pass; the live canary passed 12 of 12 focus labels; the text scan read 932 of 932 English names, dropped 0, and raised 0 alarms.  Dated live model results below are history, not re-run today.
 
 | Part | State |
 |---|---|
@@ -50,6 +50,7 @@ Checked against the code and the live wger service on 2026-10-19:  630 tests pas
 | Argument caps and tool-list pin (`homeset/harness.py`) | Added 2026-10-19 from the access audit: a list the model sends is refused unless it has at most 20 items, and each equipment item must be a string of at most 60 characters; a test fails if the Agent registers any tool beyond the two; 21 tests in `tests/test_guarantees.py`.  The access register is `docs/access-register.md`. |
 | Chat page (`homeset/web.py`, `homeset/web_page.html`, Yadan, `chat-ui` merged 2026-10-19) | `python -m homeset.web` serves a chat-style page on 127.0.0.1 in front of the same `run_once()`, so the triggers, limits, marker, and output checks all apply; the save checkpoint is a "Yes, save" click, not a typed answer; 38 tests, no model (`tests/test_web.py`).  Live view 2026-10-19 on Valerie's machine:  "15 min, a mat, legs" gave a five-exercise plan card (14.7 minutes) and the checkpoint panel;  the swap button, a "my knee hurts" message, and a real save were not tried on the page.  Yadan's self-playing opener at `/showcase` (`homeset/showcase.html`, merged 2026-10-19, about 30 seconds) shows sample plans from `evals/cases/saved_plan.json`, makes no agent call, and needs no key;  viewed 2026-10-19.  Known limits:  a program on this computer can post to it with no Origin header, and the page loads fonts from Google.  See `docs/access-register.md`. |
 | Proactive health question (`homeset/screen.py`, branch `proactive-health-check`, built 2026-10-19 after LaNice's comment at the presentation) | Code asks the fixed health question before the first plan, with no model call;  83 model-free tests (`tests/test_health_screen.py` and `tests/test_health_screen_surfaces.py`), checked by removing each rule in turn (52, 11, 5, and 1 tests failed).  Live (`evals/cases/health_screen.json`, bar written first):  18 of 18;  the earlier live sets still pass (eval card 7 of 7, controls 5 of 5, multi-turn 3 of 3, saved plan 3 of 3, vague symptoms 13 of 13).  See Open item 15. |
+| Exercise movement drawings (`homeset/web_page.html`, built 2026-10-19) | On the chat page, click an exercise in a plan card to see a looping side-view stick figure drawn in code (no images, no network), with weights for dumbbell and kettlebell names and a one-line cue.  25 movement patterns match 85% of the exercise uses in past plans (1,262 uses);  names that match none show no hint.  When the computer asks for reduced motion, the card shows two still poses and a "Play the movement" button.  4 tests (rules and patterns agree, no HTML written from names, nothing new from the network, 35 common names map correctly, every pose and five points along each motion stay inside the picture and above the floor, no joint jumps more than 12 units per 1/40 of the motion);  putting an old jumpy motion back made them fail.  A drawing shows the general motion, not a trainer's form check. |
 
 ## Set up
 
@@ -77,7 +78,7 @@ copy .env.example .env      # then put your personal API key in .env
 - Use Python 3.12 (3.9 fails the install).  `py -3.12 --version` shows whether it is installed.
 - Run the save checkpoint in a normal terminal window (Windows Terminal, PowerShell, or Command Prompt, or the integrated terminal in VS Code).  A pane that is not a real terminal prints "Not saved:  no one is here to confirm", which is correct and saves nothing.
 - To keep the demo away from a real saved plan:  `$env:HOMESET_SAVED_PLAN = "$env:TEMP\homeset_demo_plan.json"`, then `Remove-Item $env:HOMESET_SAVED_PLAN -ErrorAction SilentlyContinue`.
-- `python -m pytest` should pass with about 15 skips (the file-owner and permission tests); a run that simulates Windows by hiding `os.getuid` gave 615 passed and 15 skipped (of 630) on 2026-10-19.
+- `python -m pytest` should pass with about 15 skips (the file-owner and permission tests); a run that simulates Windows by hiding `os.getuid` gave 619 passed and 15 skipped (of 634) on 2026-10-19.
 
 ## Run
 
@@ -165,10 +166,10 @@ From the PRD and the diagram:
 The live demo runs on Valerie's machine, because Yadan has no API key yet (decided 2026-10-19).  Check these there first:
 
 1. `git pull`, then activate `.venv` (Python 3.12).
-2. `python -m pytest`:  expect 630 passed (about 615 passed and 15 skipped on Windows).
+2. `python -m pytest`:  expect 634 passed (about 619 passed and 15 skipped on Windows).
 3. `python scripts/try_checkpoint.py` in a real terminal window:  needs no key;  type `yes`, then `no`.
 4. Point the demo at a scratch saved plan, so the first checkpoint shows "(none)":  `export HOMESET_SAVED_PLAN=/tmp/homeset_demo_plan.json`, then `rm -f /tmp/homeset_demo_plan.json` (Windows steps are under "Set up").
 5. The three demo commands, in order:  `python -m homeset "I have 15 minutes and a mat.  Legs." --save` (it asks the health question first:  type `none`, then type `yes` at the save question);  `python -m homeset "Swap the first exercise." --saved` (a saved plan from the last 7 days skips the question);  `python -m homeset "My knee hurts.  I have 15 minutes and a mat.  Legs." --trace`.  They took 19.3, 12.1, and 1.3 seconds on 2026-10-19, before the health question added a few seconds of typing to the first.  On the chat page the question has a "None of these" button.
 6. `python scripts/scan_wger_text.py` and `python scripts/canary_wger.py` (live wger checks).
 
-**Backup on Yadan's machine (no key needed):**  `git pull`, activate `.venv`, `python -m pytest` (630 passed), then `python scripts/try_checkpoint.py` in a real terminal window.  The live demo needs a key in `.env` (never share a key, never commit one).
+**Backup on Yadan's machine (no key needed):**  `git pull`, activate `.venv`, `python -m pytest` (634 passed), then `python scripts/try_checkpoint.py` in a real terminal window.  The live demo needs a key in `.env` (never share a key, never commit one).
