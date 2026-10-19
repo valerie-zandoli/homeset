@@ -142,7 +142,7 @@ def test_where_there_are_no_owners_no_file_is_ignored_on_access_grounds(path, mo
     # Windows has no os.getuid and reports 0o666 for every file;  the access check must not hide every saved plan.
     save_first(path, PLAN_A)
     path.chmod(0o666)
-    monkeypatch.delattr(os, "getuid")
+    monkeypatch.delattr(os, "getuid", raising=False)  # on Windows it is already missing
     assert saved_plan.ignored_reason(path) is None and load(path) is not None
 
 
