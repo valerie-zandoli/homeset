@@ -12,11 +12,11 @@ Built from Yadan's draft of 2026-10-19 (14:58 ET) with four edits that Valerie s
 | Hook | Valerie | 5 |
 | Role | Valerie | 20 |
 | The loop | Yadan | 35 |
-| Live demo | Valerie types, Yadan narrates | 75 |
+| Live demo | Valerie types, Yadan narrates | 80 |
 | What broke and what we fixed | Valerie | 35 |
 | What is next | Yadan | 25 |
 | Close | both | 5 |
-| **Total** | | **230 (3:50)** |
+| **Total** | | **235 (3:55)** |
 
 Cut order if over:  1. the advanced-moves story;  2. the last sentence of "what is next";  3. the last 10 seconds of the showcase.
 
@@ -45,6 +45,8 @@ YADAN: Our one rule:  the AI makes the judgment calls;  the code enforces the ru
 **[LIVE DEMO, Valerie types, Yadan narrates, about 75 seconds]**
 Step 1.  Valerie types:  `python -m homeset "I have 15 minutes and a mat.  Legs." --save`
 VALERIE: Let's run it live.  "I have 15 minutes and a mat.  Legs."
+YADAN (the question appears at once, with no wait): Before any plan, our code asks about pain, injury, surgery, pregnancy, or a medical condition.  The AI has not even been called yet.  Safety does not wait for you to bring it up.
+VALERIE: [types none]
 YADAN (while it runs, about 20 seconds): Right now it's pulling real exercises from wger, building the plan, and running all eight checks.  If any check fails, you never see that plan.
 YADAN (plan appears): About fifteen minutes, five exercises, total time calculated by code.
 YADAN: Now our new feature:  saving.  Saving replaces your old plan, so HomeSet asks first.  It shows your saved plan next to the new one, and only a "yes" saves it.
@@ -82,5 +84,6 @@ YADAN: ...one plan out.  Thank you!
 | All 20 requests within 1.5 minutes (gaps -1.1 to +1.5) | `runs/20261019-015811-requests_20.json` |
 | Advanced moves blocked before and after the model | `homeset/advanced.py`;  `docs/architecture-v4.png` |
 | The trace line "the model is not called" | `--trace`;  `homeset/triggers.py` |
+| The health question is asked by code before the first plan, with no model call | `homeset/screen.py`;  `tests/test_health_screen.py` (83 tests);  `evals/cases/health_screen.json` (18 of 18 live);  README Open item 15 |
 | Save needs a typed "yes" at a terminal, or a click on the chat page | `homeset/saved_plan.py`;  `docs/access-register.md` |
 | The time model, a stopwatch trial, and the survey are not done yet | README Open item 4 (time model) and Open item 3 (survey, "Not run") |
