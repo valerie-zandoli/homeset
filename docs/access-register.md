@@ -25,7 +25,7 @@ Shell, file, and network tools for the model (beyond wger); email, calendar, and
 ## Enforcement gaps (fix, accept, or decide)
 
 1. **Fixed 2026-10-19:  `runs/` was readable by other local users.**  The folder is now mode 700 and the files 600; the files hold request text.  Repeat on any new machine, because a fresh clone creates `runs/` with default permissions.
-2. **No test pins the model's tool list to exactly two tools.**  Add one so a third tool cannot appear without a failing test and a new row here.
+2. **Fixed 2026-10-19:  the model's tool list is pinned to exactly two tools.**  An earlier test counted what `make_tools` returns, so a tool added inside `build_agent` would have passed.  `test_the_agent_registers_exactly_the_two_named_tools` now reads the tools the Agent registers; a third tool fails the test (checked by adding a `read_file` tool, then reverting) and needs a new row here.
 3. **`.env` mode is checked by hand only.**  Optional:  warn at startup when the mode is not 600.
 4. **A demo machine holds a copy of the key.**  Decide when to delete it and whether to ask Pursuit to rotate the key after the 2026-10-19 demo.
 5. **The owner check is skipped on Windows**, so a saved plan there loads without it.
