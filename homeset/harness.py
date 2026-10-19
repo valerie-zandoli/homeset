@@ -36,6 +36,7 @@ MAX_REGENERATIONS = 1
 # Longest list either tool accepts.  Live runs sent at most 2 equipment labels and 6 exercises
 # (290 tool calls); 13 equipment labels exist.  A longer list is a malformed call, so it is refused.
 MAX_LIST_ITEMS = 20
+MAX_ITEM_LEN = 60  # longest string in an equipment list; the longest alias is 15 characters
 
 # Wording is a placeholder for the pair to settle:  it must be visible and must show no plan.
 ERROR_MESSAGE = "HomeSet could not produce a plan that passed its own checks, so it is not showing one.  Please try again."
@@ -46,18 +47,27 @@ class ToolBudgetExceeded(RuntimeError):
     pass
 
 
-def _bad_list_message(name: str, value) -> str | None:
-    """The refusal text when `value` is not a list of at most MAX_LIST_ITEMS items, else None."""
-    if isinstance(value, list) and len(value) <= MAX_LIST_ITEMS:
-        return None
-    return f"{name}: expected a list of at most {MAX_LIST_ITEMS} items"
+def _bad_list_message(name: str, value, strings: bool = False) -> str | None:
+    """The refusal text when `value` is not a list of at most MAX_LIST_ITEMS items, else None.
+
+    With `strings=True` every item must also be a string of at most MAX_ITEM_LEN characters, so a long
+    unknown label is never echoed back to the model or written to the trace.
+    """
+    if not isinstance(value, list) or len(value) > MAX_LIST_ITEMS:
+        return f"{name}: expected a list of at most {MAX_LIST_ITEMS} items"
+    if strings and any(not isinstance(item, str) or len(item) > MAX_ITEM_LEN for item in value):
+        return f"{name}: items must be strings up to {MAX_ITEM_LEN} characters"
+    return None
 
 
 def _for_trace(value):
-    """A list as the trace records it:  the first MAX_LIST_ITEMS items and a marker for the rest."""
-    if isinstance(value, list) and len(value) > MAX_LIST_ITEMS:
-        return value[:MAX_LIST_ITEMS] + [f"[{len(value) - MAX_LIST_ITEMS} more items not recorded]"]
-    return value
+    """A list as the trace records it:  the first MAX_LIST_ITEMS items (long strings clipped) and a marker for the rest."""
+    if not isinstance(value, list):
+        return value
+    kept = [clip(item, MAX_ITEM_LEN) if isinstance(item, str) else item for item in value[:MAX_LIST_ITEMS]]
+    if len(value) > MAX_LIST_ITEMS:
+        kept.append(f"[{len(value) - MAX_LIST_ITEMS} more items not recorded]")
+    return kept
 
 
 @dataclass
@@ -205,7 +215,7 @@ def make_tools(state: RequestState, search_fn: Callable = search_exercises):
             reply = json.dumps({"error": "tool_call_limit", "message": str(err)})
             state.trace.add("tool_result", tool="search_exercises", ok=False, error="tool_call_limit", shown_chars=len(reply))
             return reply
-        message = _bad_list_message("equipment", equipment)
+        message = _bad_list_message("equipment", equipment, strings=True)
         if message:
             state.tool_errors.append("bad_list")
             reply = json.dumps({"error": "bad_list", "message": message})

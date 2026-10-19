@@ -155,3 +155,40 @@ def test_the_trace_of_an_oversized_call_does_not_keep_every_item():
     calls = [e for e in state.trace.as_list() if e["event"] == "tool_call"]
     assert len(calls[0]["arguments"]["equipment"]) <= CAP + 1  # the first CAP items plus one marker
     assert len(calls[1]["arguments"]["exercises"]) <= CAP + 1
+
+
+# --- equipment items:  strings up to 60 characters (the tutor's spec, 2026-10-19) ------------------------
+
+ITEM_LEN = 60  # the longest label or alias is well under this, so no real wording is refused
+
+
+def test_an_equipment_item_at_the_length_cap_is_searched():
+    calls = []
+    search, _ = make_tools(RequestState("I have 20 minutes."), _recording_search(calls))
+    reply = json.loads(search("legs", ["x" * ITEM_LEN]))
+    assert "error" not in reply and len(calls) == 1
+
+
+@pytest.mark.parametrize("item", ["x" * (ITEM_LEN + 1), 5, {"label": "mat"}, None], ids=["too long", "a number", "a dict", "none"])
+def test_a_bad_equipment_item_is_refused_before_any_search(item):
+    calls = []
+    state = RequestState("I have 20 minutes.")
+    search, _ = make_tools(state, _recording_search(calls))
+    reply = json.loads(search("legs", ["mat", item]))
+    assert reply["error"] == "bad_list" and str(ITEM_LEN) in reply["message"]
+    assert calls == [] and state.tool_errors == ["bad_list"]
+
+
+def test_a_long_unknown_label_is_never_echoed_back_to_the_model():
+    state = RequestState("I have 20 minutes.")
+    search, _ = make_tools(state)
+    reply = search("legs", ["Z" * 5000])
+    assert len(reply) < 400
+
+
+def test_the_trace_clips_a_long_equipment_string():
+    state = RequestState("I have 20 minutes.")
+    search, _ = make_tools(state, _recording_search([]))
+    search("legs", ["Z" * 5000])
+    call = [e for e in state.trace.as_list() if e["event"] == "tool_call"][0]
+    assert len(call["arguments"]["equipment"][0]) < 200
