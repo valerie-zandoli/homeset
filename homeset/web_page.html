@@ -108,6 +108,7 @@ footer { font-size: 12px; color: var(--muted); text-align: center; margin-top: 1
 const chat = document.getElementById("chat");
 const sendBtn = document.getElementById("send");
 let busy = false;
+let fresh = true;  // the first request after the page loads starts a new conversation
 
 function el(tag, cls, text) {
   const n = document.createElement(tag);
@@ -190,7 +191,13 @@ async function offerSave(bubble, saveBtn, planText) {
 function showReply(reply) {
   if (reply.kind === "plan") return addRow("bot", planBubble(reply));
   const cls = reply.kind === "handoff" ? "bubble handoff" : reply.kind === "error" ? "bubble error" : "bubble";
-  addRow("bot", el("div", cls, reply.text));
+  const bubble = el("div", cls, reply.text);
+  if (reply.screen) {  // the health question:  one tap answers "none";  anything typed works too
+    const none = el("button", null, "None of these"); none.type = "button";
+    none.addEventListener("click", () => { none.disabled = true; run("none", "/api/ask", { message: "none" }); });
+    const actions = el("div", "actions"); actions.appendChild(none); bubble.appendChild(actions);
+  }
+  addRow("bot", bubble);
 }
 
 async function run(userText, url, body) {
@@ -201,7 +208,7 @@ async function run(userText, url, body) {
   const dots = el("span", "typing"); dots.setAttribute("aria-label", "HomeSet is building your plan");
   dots.append(el("i"), el("i"), el("i")); wait.appendChild(dots);
   const waitRow = addRow("bot", wait);
-  try { showReply(await post(url, body)); }
+  try { const reply = await post(url, { ...body, fresh }); fresh = false; showReply(reply); }
   catch (e) { showReply({ kind: "error", text: "Could not reach HomeSet. Is it still running in the terminal?" }); }
   finally { waitRow.remove(); busy = false; sendBtn.disabled = false; }
 }

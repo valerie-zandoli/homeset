@@ -3,6 +3,10 @@
 Add --mock to use canned wger data instead of the network (the model call still needs
 the API key in .env).  Add --trace to print the step-by-step trace of the request.
 
+Health question (LaNice, 2026-10-19):  before the first plan, code asks about pain, injury, surgery, pregnancy, and medical
+conditions.  At a terminal you answer it here;  with no terminal it prints the question and stops.  Add --no-health-issues
+to say in the command that you have none (for scripts).  A swap of a saved plan from the last 7 days skips the question.
+
 Save and swap (Build Time, Learn 08):
     python -m homeset "I have 20 minutes and a mat.  Legs." --save
         After a plan, shows it next to the saved plan and asks once;  only the answer "yes" saves.
@@ -16,11 +20,12 @@ import sys
 
 from . import saved_plan
 from .agent import run_once
+from .screen import SCREEN_REASON, Screen
 from .trace import format_trace
 
 
-USAGE = 'usage: python -m homeset "your request" [--mock] [--trace] [--save] [--saved]'
-FLAGS = {"--mock", "--trace", "--save", "--saved"}
+USAGE = 'usage: python -m homeset "your request" [--mock] [--trace] [--save] [--saved] [--no-health-issues]'
+FLAGS = {"--mock", "--trace", "--save", "--saved", "--no-health-issues"}
 
 
 def main(argv: list[str]) -> int:
@@ -48,14 +53,25 @@ def main(argv: list[str]) -> int:
             print(f"{reason}\n" if reason else "", end="")
             print(saved_plan.NO_SAVED_PLAN)
             return 1
-    if earlier:
-        outcome = run_once(" ".join(args), search_fn, earlier.plan, earlier.saved_at)
-    else:
-        outcome = run_once(" ".join(args), search_fn)
+    screen = Screen(cleared="--no-health-issues" in argv)  # one object between the question and its answer
+    plan_args = (earlier.plan, earlier.saved_at) if earlier else (None, "")
+    outcome = run_once(" ".join(args), search_fn, *plan_args, screen=screen)
+    asked = 0
+    while outcome.kind == "question" and outcome.reason == SCREEN_REASON and sys.stdin.isatty() and asked < 2:
+        print(f"[question]\n\n{outcome.text}")
+        try:
+            answer = input("> ")
+        except EOFError:
+            break
+        asked += 1
+        outcome = run_once(answer, search_fn, *plan_args, screen=screen)
+        print()
     print(f"[{outcome.kind}]\n")
     print(outcome.text)
     for failure in outcome.failures:
         print(f"  failed check: {failure}")
+    if outcome.kind == "question" and outcome.reason == SCREEN_REASON:  # no terminal to answer in
+        print("\n(Answer in a terminal window, or add --no-health-issues to say you have none.)")
     if "--trace" in argv:
         print("\n--- trace ---")
         print(format_trace(outcome.trace))

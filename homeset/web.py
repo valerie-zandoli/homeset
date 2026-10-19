@@ -37,6 +37,7 @@ from pathlib import Path
 from . import saved_plan
 from .agent import run_once
 from .checks import parse_plan
+from .screen import SCREEN_REASON, Screen
 
 HOST = "127.0.0.1"
 DEFAULT_PORT = 8000
@@ -55,8 +56,11 @@ class App:
         self.search_fn = search_fn
         self.path = path or saved_plan.default_path()
         self.pending: dict[str, saved_plan.Proposal] = {}  # one answer per proposal
+        self.screen = Screen()  # the health question's state for the page that is open (a reload starts a new one)
 
-    def ask(self, message: object, use_saved: bool = False) -> dict:
+    def ask(self, message: object, use_saved: bool = False, fresh: bool = False) -> dict:
+        if fresh:  # the first message after the page loads is a new conversation
+            self.screen = Screen()
         if not isinstance(message, str) or not message.strip():
             return {"kind": "question", "text": "What would you like?  Tell me your minutes, gear, and focus."}
         if len(message) > MAX_MESSAGE_CHARS:
@@ -68,14 +72,16 @@ class App:
                 return {"kind": "question", "text": saved_plan.NO_SAVED_PLAN}
         try:
             if earlier:
-                outcome = run_once(message.strip(), self.search_fn, earlier.plan, earlier.saved_at)
+                outcome = run_once(message.strip(), self.search_fn, earlier.plan, earlier.saved_at, screen=self.screen)
             else:
-                outcome = run_once(message.strip(), self.search_fn)
+                outcome = run_once(message.strip(), self.search_fn, screen=self.screen)
         except SystemExit as err:  # agent.py exits when the key is missing; the server keeps running
             return {"kind": "error", "text": f"HomeSet cannot start:  {err}"}
         except Exception:  # a model or network failure shows a visible error, never a plan
             return {"kind": "error", "text": "Something went wrong reaching the model, so there is no plan.  Please try again."}
         reply = {"kind": outcome.kind, "text": outcome.text}
+        if outcome.kind == "question" and outcome.reason == SCREEN_REASON:
+            reply["screen"] = True  # the page offers a "None of these" button
         if outcome.kind == "plan":
             reply["plan"] = plan_parts(outcome.text)
         return reply
@@ -193,9 +199,9 @@ def make_handler(app: App, port: int):
                 return self._json(400, {"error": "not a JSON object"})
             route = self.path.split("?")[0]
             if route == "/api/ask":
-                return self._json(200, app.ask(data.get("message"), bool(data.get("use_saved"))))
+                return self._json(200, app.ask(data.get("message"), bool(data.get("use_saved")), bool(data.get("fresh"))))
             if route == "/api/swap":
-                return self._json(200, app.ask(SWAP_REQUEST, use_saved=True))
+                return self._json(200, app.ask(SWAP_REQUEST, use_saved=True, fresh=bool(data.get("fresh"))))
             if route == "/api/save/propose":
                 return self._json(200, app.propose(data.get("plan")))
             if route == "/api/save/answer":

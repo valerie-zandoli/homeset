@@ -31,7 +31,7 @@ def path(tmp_path):
 def calls(monkeypatch):
     seen = []
 
-    def fake_run_once(message, search_fn=None, earlier_plan=None, earlier_plan_at=""):
+    def fake_run_once(message, search_fn=None, earlier_plan=None, earlier_plan_at="", screen=None):
         seen.append({"message": message, "earlier_plan": earlier_plan})
         if "hurt" in message:
             return Outcome(kind="handoff", text=HANDOFF_SENTENCE)

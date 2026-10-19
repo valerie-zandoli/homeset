@@ -112,7 +112,7 @@ def home(tmp_path, monkeypatch):
 
 
 def fake_run_once(calls, outcome):
-    def run_once(message, search_fn=None, earlier_plan=None, earlier_plan_at=""):
+    def run_once(message, search_fn=None, earlier_plan=None, earlier_plan_at="", screen=None):
         calls.append((message, earlier_plan, earlier_plan_at))
         return outcome
 
