@@ -215,3 +215,9 @@ def test_a_model_failure_shows_an_error_not_a_plan(path, monkeypatch):
 )
 def test_names_with_brackets_display_whole(body, name, equipment):
     assert web._split_last_group(body) == (name, equipment)
+
+
+def test_the_showcase_loads_and_makes_no_agent_calls(server, calls):
+    status, body = request(server, "/showcase")
+    assert status == 200 and b"HomeSet Showcase" in body and calls == []
+    assert b"fetch(" not in body  # it plays from its own data, never the agent
