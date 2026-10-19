@@ -33,6 +33,9 @@ from .wger import WgerUnavailable, search_exercises
 
 MAX_TOOL_CALLS = 10
 MAX_REGENERATIONS = 1
+# Longest list either tool accepts.  Live runs sent at most 2 equipment labels and 6 exercises
+# (290 tool calls); 13 equipment labels exist.  A longer list is a malformed call, so it is refused.
+MAX_LIST_ITEMS = 20
 
 # Wording is a placeholder for the pair to settle:  it must be visible and must show no plan.
 ERROR_MESSAGE = "HomeSet could not produce a plan that passed its own checks, so it is not showing one.  Please try again."
@@ -41,6 +44,20 @@ BUDGET_MESSAGE = "HomeSet reached its limit of 10 tool calls for one request, so
 
 class ToolBudgetExceeded(RuntimeError):
     pass
+
+
+def _bad_list_message(name: str, value) -> str | None:
+    """The refusal text when `value` is not a list of at most MAX_LIST_ITEMS items, else None."""
+    if isinstance(value, list) and len(value) <= MAX_LIST_ITEMS:
+        return None
+    return f"{name}: expected a list of at most {MAX_LIST_ITEMS} items"
+
+
+def _for_trace(value):
+    """A list as the trace records it:  the first MAX_LIST_ITEMS items and a marker for the rest."""
+    if isinstance(value, list) and len(value) > MAX_LIST_ITEMS:
+        return value[:MAX_LIST_ITEMS] + [f"[{len(value) - MAX_LIST_ITEMS} more items not recorded]"]
+    return value
 
 
 @dataclass
@@ -178,7 +195,7 @@ def make_tools(state: RequestState, search_fn: Callable = search_exercises):
 
     def search_exercises_tool(focus: str, equipment: list[str]) -> str:
         state.trace.add(
-            "tool_call", tool="search_exercises", arguments={"focus": focus, "equipment": equipment},
+            "tool_call", tool="search_exercises", arguments={"focus": focus, "equipment": _for_trace(equipment)},
             calls_before=state.tool_calls,
         )
         try:
@@ -187,6 +204,14 @@ def make_tools(state: RequestState, search_fn: Callable = search_exercises):
             state.tool_errors.append("tool_call_limit")
             reply = json.dumps({"error": "tool_call_limit", "message": str(err)})
             state.trace.add("tool_result", tool="search_exercises", ok=False, error="tool_call_limit", shown_chars=len(reply))
+            return reply
+        message = _bad_list_message("equipment", equipment)
+        if message:
+            state.tool_errors.append("bad_list")
+            reply = json.dumps({"error": "bad_list", "message": message})
+            state.trace.add(
+                "tool_result", tool="search_exercises", ok=False, error="bad_list", message=message, shown_chars=len(reply)
+            )
             return reply
         try:
             result = search_fn(focus, equipment)
@@ -216,7 +241,8 @@ def make_tools(state: RequestState, search_fn: Callable = search_exercises):
 
     def calculate_plan_time_tool(exercises: list[dict]) -> str:
         state.trace.add(
-            "tool_call", tool="calculate_plan_time", arguments={"exercises": exercises}, calls_before=state.tool_calls
+            "tool_call", tool="calculate_plan_time", arguments={"exercises": _for_trace(exercises)},
+            calls_before=state.tool_calls,
         )
         try:
             state.spend()
@@ -224,6 +250,15 @@ def make_tools(state: RequestState, search_fn: Callable = search_exercises):
             state.tool_errors.append("tool_call_limit")
             reply = json.dumps({"error": "tool_call_limit", "message": str(err)})
             state.trace.add("tool_result", tool="calculate_plan_time", ok=False, error="tool_call_limit", shown_chars=len(reply))
+            return reply
+        message = _bad_list_message("exercises", exercises)
+        if message:
+            state.tool_errors.append("bad_list")
+            reply = json.dumps({"error": "bad_list", "message": message})
+            state.trace.add(
+                "tool_result", tool="calculate_plan_time", ok=False, error="bad_list", message=message,
+                shown_chars=len(reply),
+            )
             return reply
         try:
             reply = json.dumps({"total_minutes": calculate_plan_time(exercises)})

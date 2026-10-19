@@ -98,3 +98,60 @@ def test_the_agent_registers_exactly_the_two_named_tools(monkeypatch):
     monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-test-not-a-real-key")  # load_dotenv() does not override this
     agent = build_agent(RequestState("I have 20 minutes."))
     assert sorted(agent.tool_names) == ["calculate_plan_time", "search_exercises"]
+
+
+# --- argument size caps:  the bar was written before the code (access-register gap, 2026-10-19) --------
+
+CAP = 20  # live runs sent at most 2 equipment labels and 6 exercises (290 tool calls); 13 equipment labels exist
+EXERCISE = {"sets": 1, "reps": 10, "rest_seconds": 0}
+
+
+def _recording_search(calls):
+    def search(focus, equipment):
+        calls.append((focus, list(equipment)))
+        return {"focus": focus, "equipment_ids": [7], "groups": []}
+
+    return search
+
+
+def test_an_equipment_list_at_the_cap_is_searched():
+    calls = []
+    search, _ = make_tools(RequestState("I have 20 minutes."), _recording_search(calls))
+    reply = json.loads(search("legs", ["mat"] * CAP))
+    assert "error" not in reply and len(calls) == 1
+
+
+@pytest.mark.parametrize("bad", [["mat"] * (CAP + 1), "mat", None], ids=["too long", "a string", "none"])
+def test_a_bad_equipment_argument_is_refused_before_any_search(bad):
+    calls = []
+    state = RequestState("I have 20 minutes.")
+    search, _ = make_tools(state, _recording_search(calls))
+    reply = json.loads(search("legs", bad))
+    assert reply["error"] == "bad_list" and str(CAP) in reply["message"]
+    assert calls == [] and state.tool_errors == ["bad_list"]
+    assert state.tool_calls == 1  # a refused call still counts against the 10-call cap
+
+
+def test_an_exercise_list_at_the_cap_is_added_up():
+    _, plan_time = make_tools(RequestState("I have 20 minutes."))
+    reply = json.loads(plan_time([EXERCISE] * CAP))
+    assert "total_minutes" in reply
+
+
+@pytest.mark.parametrize("bad", [[EXERCISE] * (CAP + 1), "squats", None], ids=["too long", "a string", "none"])
+def test_a_bad_exercise_argument_is_refused_before_any_arithmetic(bad):
+    state = RequestState("I have 20 minutes.")
+    _, plan_time = make_tools(state)
+    reply = json.loads(plan_time(bad))
+    assert reply["error"] == "bad_list" and str(CAP) in reply["message"]
+    assert state.tool_errors == ["bad_list"] and state.tool_calls == 1
+
+
+def test_the_trace_of_an_oversized_call_does_not_keep_every_item():
+    state = RequestState("I have 20 minutes.")
+    search, plan_time = make_tools(state, _recording_search([]))
+    search("legs", ["mat"] * 5000)
+    plan_time([EXERCISE] * 5000)
+    calls = [e for e in state.trace.as_list() if e["event"] == "tool_call"]
+    assert len(calls[0]["arguments"]["equipment"]) <= CAP + 1  # the first CAP items plus one marker
+    assert len(calls[1]["arguments"]["exercises"]) <= CAP + 1
