@@ -31,6 +31,7 @@ from homeset.agent import run_conversation, run_once  # noqa: E402
 from homeset.checks import parse_plan  # noqa: E402
 from homeset.harness import RequestState, handle_request  # noqa: E402
 from homeset.mock_wger import mock_get, mock_search  # noqa: E402
+from homeset.screen import Screen  # noqa: E402
 from homeset.trace import trace_fields  # noqa: E402
 from homeset.wger import WgerUnavailable, _default_get as wger_default_get, search_exercises  # noqa: E402
 
@@ -134,7 +135,7 @@ def main() -> int:
         search = search_for(case, args.mock)
         if "turns" in case:
             turns = case["turns"]
-            outcomes = run_conversation([t["input"] for t in turns], search)
+            outcomes = run_conversation([t["input"] for t in turns], search, screen=Screen(required=bool(case.get("screen"))))
             checks = [meets(o, t["expect"]) for o, t in zip(outcomes, turns)]
             ok = all(checks)
             passed += ok
@@ -149,9 +150,9 @@ def main() -> int:
         if "scripted_reply" in case:  # model-free case:  the reply is fixed and the harness is real
             outcome = handle_request(case["input"], lambda _text: case["scripted_reply"], RequestState(case["input"]))
         elif "saved_plan" in case:  # a swap session:  start from a plan saved in an earlier session
-            outcome = run_once(case["input"], search, case["saved_plan"], case.get("saved_at", ""))
+            outcome = run_once(case["input"], search, case["saved_plan"], case.get("saved_at", ""), screen=Screen(required=bool(case.get("screen"))))
         else:
-            outcome = run_once(case["input"], search)
+            outcome = run_once(case["input"], search, screen=Screen(required=bool(case.get("screen"))))
         ok = meets(outcome, case["expect"])
         extra = {}
         if "changed" in case["expect"] and "saved_plan" in case:  # counted by code, not by a reader

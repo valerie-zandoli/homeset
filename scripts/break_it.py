@@ -46,7 +46,7 @@ from homeset.messages import VAGUE_QUESTION  # noqa: E402
 
 CASES = json.loads((ROOT / "evals" / "cases" / "saved_plan.json").read_text())["cases"]
 PLAN = CASES[0]["saved_plan"]  # a real plan from a live run
-SAVED_AT = "2026-10-15 09:00 EDT"
+SAVED_AT = time.strftime("%Y-%m-%d %H:%M") + " EDT"  # recent, so a swap does not meet the health question
 SWAP = "Swap the first exercise for something else."
 
 
