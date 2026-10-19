@@ -87,7 +87,9 @@ def ignored_reason(path: Path | None = None) -> str | None:
         return None
     if not stat.S_ISREG(info.st_mode):
         return "I ignored the saved plan file because it is not a plain file (a link or a folder is not trusted)."
-    if hasattr(os, "getuid") and info.st_uid != os.getuid():
+    if not hasattr(os, "getuid"):  # Windows keeps no owner or permission bits we can read:  every file would look open
+        return None
+    if info.st_uid != os.getuid():
         return "I ignored the saved plan file because another user owns it."
     if info.st_mode & 0o022:
         return "I ignored the saved plan file because other users can change it.  Run chmod 600 on it to trust it again."

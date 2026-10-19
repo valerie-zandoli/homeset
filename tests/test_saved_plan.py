@@ -15,6 +15,8 @@ from homeset.checks import HANDOFF_SENTENCE
 from homeset.harness import RequestState, make_tools
 from homeset.saved_plan import Approval, confirm, load, offer_save, propose, write
 
+posix_only = pytest.mark.skipif(not hasattr(os, "getuid"), reason="file owners and permission bits are POSIX")
+
 CASES = json.loads((Path(saved_plan.ROOT) / "evals" / "cases" / "saved_plan.json").read_text())["cases"]
 PLAN_A = CASES[0]["saved_plan"]  # a real plan from a live run, 5 exercises
 PLAN_B = CASES[1]["saved_plan"]  # a different real plan
@@ -103,6 +105,7 @@ def test_the_time_we_write_always_loads_even_if_the_clock_name_is_odd(path, monk
 # --- access control:  the saved plan belongs to the user who runs HomeSet --------------------------------
 
 
+@posix_only
 @pytest.mark.parametrize("mode", [0o600, 0o640, 0o644, 0o400])
 def test_a_file_only_its_owner_can_change_loads(path, mode):
     save_first(path, PLAN_A)
@@ -110,6 +113,7 @@ def test_a_file_only_its_owner_can_change_loads(path, mode):
     assert load(path) is not None and saved_plan.ignored_reason(path) is None
 
 
+@posix_only
 @pytest.mark.parametrize("mode", [0o620, 0o660, 0o664, 0o602, 0o606, 0o666])
 def test_a_file_that_group_or_others_can_change_is_ignored_with_a_reason(path, mode):
     save_first(path, PLAN_A)
@@ -118,12 +122,14 @@ def test_a_file_that_group_or_others_can_change_is_ignored_with_a_reason(path, m
     assert "other users can change it" in saved_plan.ignored_reason(path)
 
 
+@posix_only
 def test_a_file_owned_by_another_user_is_ignored(path, monkeypatch):
     save_first(path, PLAN_A)
     monkeypatch.setattr(os, "getuid", lambda: os.stat(path).st_uid + 1)
     assert load(path) is None and "another user owns it" in saved_plan.ignored_reason(path)
 
 
+@posix_only
 def test_a_link_to_a_valid_saved_file_is_not_trusted(tmp_path):
     real = tmp_path / "real.json"
     save_first(real, PLAN_A)
@@ -132,10 +138,19 @@ def test_a_link_to_a_valid_saved_file_is_not_trusted(tmp_path):
     assert load(link) is None and "not a plain file" in saved_plan.ignored_reason(link)
 
 
+def test_where_there_are_no_owners_no_file_is_ignored_on_access_grounds(path, monkeypatch):
+    # Windows has no os.getuid and reports 0o666 for every file;  the access check must not hide every saved plan.
+    save_first(path, PLAN_A)
+    path.chmod(0o666)
+    monkeypatch.delattr(os, "getuid")
+    assert saved_plan.ignored_reason(path) is None and load(path) is not None
+
+
 def test_no_file_has_no_reason_to_ignore_it(path):
     assert saved_plan.ignored_reason(path) is None
 
 
+@posix_only
 def test_a_save_over_an_ignored_file_makes_it_trusted_again(path):
     save_first(path, PLAN_A)
     path.chmod(0o666)
@@ -284,6 +299,7 @@ def test_an_invalid_plan_is_never_offered(path):
     assert ask.prompts == [] and not path.exists()
 
 
+@posix_only
 def test_the_file_is_owner_only_and_holds_the_plan_and_the_time_only(path):
     save_first(path, PLAN_A)
     assert stat.S_IMODE(path.stat().st_mode) == 0o600

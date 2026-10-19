@@ -5,6 +5,7 @@ No model, no network.  The saved plans are the real ones in evals/cases/saved_pl
 """
 
 import json
+import os
 from pathlib import Path
 
 import pytest
@@ -125,6 +126,7 @@ def test_saved_with_no_saved_plan_stops_before_the_model(home, monkeypatch, caps
     assert calls == [] and saved_plan.NO_SAVED_PLAN in capsys.readouterr().out
 
 
+@pytest.mark.skipif(not hasattr(os, "getuid"), reason="POSIX file modes")
 def test_saved_says_why_when_the_file_is_ignored(home, monkeypatch, capsys):
     proposal = saved_plan.propose(D1, home)
     saved_plan.write(proposal, saved_plan.confirm(proposal, "yes"), home)
