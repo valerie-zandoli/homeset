@@ -81,13 +81,31 @@ python scripts/canary_wger.py                                       # live known
 ## How it fits together
 
 ```
-user message -> model + system prompt -> tool runner -> wger
-                      |   ^                    |
-                      |   +---- clean results -+
-                      v
-               output checks (plans only) -> user
- hand-off, error, or one question ------------> user  (skips the checks)
+user message
+    |
+    v
+safety check in code ----- hand-off sentence or one fixed question -----> user
+    |  (no trigger)             (the model is not called)
+    v
+model + system prompt ----- tool call -----> tool runner -----> wger
+    |   ^                                                          |
+    |   +----------- clean results (context feeding) <-------------+
+    |
+    +-- its own fixed message (question, error) ----------------------> user  (skips the checks)
+    |
+    v
+"(assumed)" marker, written by code
+    |
+    v
+output checks (plans only) ----- pass -----> user
+    |
+    +-- fail: back to the model once; a second failure is a visible error and no plan
+
+save and swap (the command line, outside the model):
+user types "yes" at a terminal -> saved_plan.json -> a later --saved run -> model, once, as data
 ```
+
+The same picture with every box and the loops is `docs/architecture-v4.png`.
 
 - The model picks labels from fixed lists (`FOCUS LABELS`, `EQUIPMENT LABELS`); code turns them into wger numbers.  The model sends no numbers; the results it reads carry each exercise's wger `id` and `equipment_ids` (and the filter), which the checks use.
 - Code adds `language=2`, always adds bodyweight (equipment 7), repeats a filter once per value, follows the next-page link, and marks any cut list ("showing 40 of 56").
