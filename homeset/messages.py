@@ -24,6 +24,14 @@ HANDOFF = (
     "Please talk to a doctor or physical therapist first."
 )
 VAGUE_QUESTION = "Is that ordinary soreness or tiredness, or does it hurt?"  # fired by code (triggers.find_vague)
+SCREEN_QUESTION = (  # fired by code before the first plan (homeset/screen.py)
+    "Before I plan:  do you have any pain, injury, surgery, pregnancy, or medical condition I should know about?  "
+    "Reply \"none\" or tell me."
+)
+SCREEN_AGAIN = (  # the one more ask after an unclear answer
+    "I need a clear answer before I plan.  Do you have any pain, injury, surgery, pregnancy, or medical condition?  "
+    "Reply \"none\" or tell me."
+)
 UNREACHABLE = "I could not reach the exercise database.  Would you like me to try once more?"
 NO_MATCH = (
     "I could not find any exercises for <focus> with <equipment>.  "

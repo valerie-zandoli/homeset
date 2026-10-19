@@ -24,7 +24,8 @@ from typing import Callable
 
 from .assumed import MARKER, mark_assumed, stated_in_plan
 from .checks import HANDOFF_SENTENCE, check_plan, check_results, classify
-from .messages import VAGUE_QUESTION
+from .messages import SCREEN_AGAIN, SCREEN_QUESTION, VAGUE_QUESTION
+from .screen import SCREEN_REASON, Screen, answer_class, recent_enough, request_clears
 from .triggers import find_trigger, find_vague
 from .labels import UnknownLabel
 from .plan_time import calculate_plan_time
@@ -89,12 +90,22 @@ class RequestState:
     earlier_plan: str | None = None  # a plan saved in an earlier session, passed to the model once as data
     earlier_plan_at: str = ""
     carried_stated: str = ""  # equipment and focus words the earlier plan's user stated (see assumed.stated_in_plan)
+    clarifying_question: str = VAGUE_QUESTION  # the code-fired question the answer turn replies to
+    screen: Screen = field(default_factory=lambda: Screen(required=False))  # the health question (homeset/screen.py);
+    # off here so direct harness callers keep their behavior;  agent.run_once turns it on for every product entry point
 
     def __post_init__(self) -> None:
         if self.requested_minutes is None:
             self.requested_minutes = extract_minutes(self.user_message)
         if not self.conversation_text:
             self.conversation_text = self.user_message
+
+    def resume_from(self, held: str) -> None:
+        """The answer turn of a question asked in an earlier call:  the held request joins the conversation, so the
+        trigger scan covers both messages and the minutes it named carry over."""
+        if held and held not in self.conversation_text:
+            self.conversation_text = f"{held}  {self.conversation_text}"
+        self.requested_minutes = self.requested_minutes or extract_minutes(held)
 
     def attach_earlier_plan(self, plan: str, saved_at: str) -> None:
         """Start a swap session from a saved plan.  Its minutes become the target unless the
@@ -356,11 +367,11 @@ def _ask(ask_model: Callable[[str], str], state: RequestState, prompt: str, atte
     return text
 
 
-def _with_earlier_request(earlier: str, answer: str) -> str:
+def _with_earlier_request(earlier: str, answer: str, question: str = VAGUE_QUESTION) -> str:
     """The model's prompt for the turn that answers the code-fired question."""
     return (
         f"Earlier request: {earlier}\n"
-        f"You asked: {VAGUE_QUESTION}\n"
+        f"You asked: {question}\n"
         f"The user answered: {answer}\n"
         "Follow the safety rule in step 1, then plan the earlier request."
     )
@@ -376,24 +387,80 @@ def _with_earlier_plan(plan: str, saved_at: str, request: str) -> str:
     )
 
 
+def _ask_health_question(user_message: str, state: RequestState) -> Outcome | None:
+    """Before the first plan:  the one fixed health question, unless the request or a recent saved plan already settles it."""
+    screen = state.screen
+    if not screen.required or screen.cleared:
+        return None
+    if state.earlier_plan and recent_enough(state.earlier_plan_at):
+        screen.cleared = True
+        state.trace.add("screen", result="skipped:  the saved plan is recent", saved_at=state.earlier_plan_at)
+        return None
+    if request_clears(user_message):
+        screen.cleared = True
+        state.trace.add("screen", result="skipped:  the request says there is no pain, injury, or condition")
+        return None
+    screen.asked, screen.held = 1, user_message  # the model is never called
+    state.trace.add("screen", result="asked")
+    return Outcome("question", SCREEN_QUESTION, reason=SCREEN_REASON)
+
+
+def _answer_health_question(user_message: str, state: RequestState) -> Outcome | None:
+    """The answer turn.  A clear answer lets the held request go on to the model (returns None);  anything else
+    is another ask or a hand-off.  A health word in the answer was already handed off by the trigger scan."""
+    screen = state.screen
+    if find_vague(user_message):  # "my knee feels off" is not an answer
+        state.trace.add("screen", result="handed off:  a vague answer")
+        return Outcome("handoff", HANDOFF_SENTENCE, reason="vague answer to the health question")
+    if answer_class(user_message) == "clear":
+        screen.cleared = True
+        state.clarifying_for, state.clarifying_question = screen.held or state.conversation_text, SCREEN_QUESTION
+        state.trace.add("screen", result="cleared by the answer")
+        return None
+    if screen.asked == 1:
+        screen.asked = 2
+        state.trace.add("screen", result="asked again:  the answer was unclear")
+        return Outcome("question", SCREEN_AGAIN, reason=SCREEN_REASON)
+    state.trace.add("screen", result="handed off:  the answer was unclear twice")
+    return Outcome("handoff", HANDOFF_SENTENCE, reason="unclear health answer, twice")
+
+
 def _run_request(user_message: str, ask_model: Callable[[str], str], state: RequestState) -> Outcome:
+    screen = state.screen
+    if screen.pending and screen.held:  # a later call:  the held request joins this answer turn
+        state.resume_from(screen.held)
     state.trace.add("request", message=clip(user_message), minutes_requested=state.requested_minutes)
     trigger = find_trigger(state.conversation_text or user_message)
     state.trace.add("trigger", fired=trigger is not None, word=trigger)
     if trigger:  # the model is never called
         return Outcome("handoff", HANDOFF_SENTENCE, reason=trigger)
-    vague = find_vague(user_message)  # the latest message only:  an answer to our question must not re-fire
+    if screen.pending:  # this message answers the health question
+        outcome = _answer_health_question(user_message, state)
+        if outcome:
+            return outcome
+        vague = None
+    else:
+        vague = find_vague(user_message)  # the latest message only:  an answer to our question must not re-fire
     state.trace.add("vague", fired=vague is not None, phrase=vague, asked_before=state.vague_asked)
     if vague and state.vague_asked:  # still vague after the question:  err toward the hand-off
         return Outcome("handoff", HANDOFF_SENTENCE, reason=f"vague again: {vague}")
     if vague:  # the model is never called
         state.vague_asked = True
         state.clarifying_for = user_message
+        state.clarifying_question = VAGUE_QUESTION
         return Outcome("question", VAGUE_QUESTION, reason=vague)
+    if state.clarifying_for and screen.required and not screen.cleared:  # the vague question was a health question too
+        screen.cleared = True
+        state.trace.add("screen", result="cleared by the answer to the vague question")
+    elif not state.clarifying_for:
+        outcome = _ask_health_question(user_message, state)
+        if outcome:
+            return outcome
     prompt = user_message
     if state.clarifying_for:  # the model never saw the earlier request, so pass it along with the answer
-        prompt = _with_earlier_request(state.clarifying_for, user_message)
+        prompt = _with_earlier_request(state.clarifying_for, user_message, state.clarifying_question)
         state.clarifying_for = None
+        state.clarifying_question = VAGUE_QUESTION
     if state.earlier_plan:  # a swap session:  the model has not seen the saved plan, so pass it once
         state.trace.add("earlier_plan", saved_at=state.earlier_plan_at, chars=len(state.earlier_plan))
         prompt = _with_earlier_plan(state.earlier_plan, state.earlier_plan_at, prompt)

@@ -13,6 +13,7 @@ from __future__ import annotations
 import os
 
 from .harness import Outcome, RequestState, handle_request, make_tools
+from .screen import Screen
 from .prompt import SYSTEM_PROMPT
 
 DEFAULT_MODEL_ID = "anthropic/claude-sonnet-5-5"  # set MODEL_ID in .env to override
@@ -70,24 +71,26 @@ def build_agent(state: RequestState, search_fn=None):
     )
 
 
-def run_once(user_message: str, search_fn=None, earlier_plan: str | None = None, earlier_plan_at: str = "") -> Outcome:
+def run_once(user_message: str, search_fn=None, earlier_plan: str | None = None, earlier_plan_at: str = "",
+             screen: Screen | None = None) -> Outcome:
     """One request.  `earlier_plan` is a plan saved in an earlier session (a swap session); it is
     plain text here, and this module never touches the file or the save step."""
-    state = RequestState(user_message=user_message)
+    state = RequestState(user_message=user_message, screen=screen if screen is not None else Screen())  # asks unless told not to
     if earlier_plan:
         state.attach_earlier_plan(earlier_plan, earlier_plan_at)
     agent = build_agent(state, search_fn)
     return handle_request(user_message, lambda text: str(agent(text)), state)
 
 
-def run_conversation(turns: list[str], search_fn=None, agent_factory=build_agent) -> list[Outcome]:
+def run_conversation(turns: list[str], search_fn=None, agent_factory=build_agent, screen: Screen | None = None) -> list[Outcome]:
     """One conversation with several user messages and one model history (multi-turn evals).
 
     The model keeps the whole conversation; the harness treats each message as its own
     request, so the 10-call cap and the output checks restart every turn.  `agent_factory`
     exists so tests can pass a scripted agent that needs no key.
     """
-    state = RequestState(user_message=turns[0])
+    # Multi-turn evals and tests opt in with screen=Screen();  the product's own entry points (run_once) ask by default.
+    state = RequestState(user_message=turns[0], screen=screen if screen is not None else Screen(required=False))
     agent = agent_factory(state, search_fn)
     outcomes = []
     for turn in turns:
