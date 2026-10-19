@@ -1,0 +1,170 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>HomeSet agent architecture (version 5, as built)</title>
+<!-- Source of docs/architecture-v5.png.  Render:
+     "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" --headless --disable-gpu --hide-scrollbars \
+       --window-size=1900,1700 --screenshot=docs/architecture-v5.png file://$PWD/docs/architecture-v5.html -->
+<style>
+  :root { --ink:#1b1b22; --muted:#5d5d6b; --line:#2a2a33; --blue:#1a4fd6; --blue-bg:#eaf0ff; --red:#b3261e; --red-bg:#fdecea; --green:#1d6b37; --yellow:#fff6d6; --panel:#f5f5f8; }
+  * { box-sizing: border-box; }
+  body { margin:0; padding:28px 32px; width:1900px; font:15px/1.4 "Helvetica Neue", Arial, sans-serif; color:var(--ink); background:#fff; }
+  h1 { margin:0 0 4px; font-size:38px; }
+  .sub { color:var(--muted); margin:0 0 18px; font-size:15px; }
+  .grid { display:grid; grid-template-columns: 410px 1fr 470px; gap:22px; align-items:start; }
+  .col { display:flex; flex-direction:column; gap:12px; }
+  .box { border:2px solid var(--line); border-radius:10px; padding:11px 14px; background:#fff; }
+  .box h2 { margin:0 0 6px; font-size:15px; letter-spacing:.2px; }
+  .box p { margin:5px 0; }
+  .box ol, .box ul { margin:4px 0; padding-left:20px; }
+  .box li { margin:3px 0; }
+  .code { font:12px/1.35 Menlo, Consolas, monospace; color:var(--muted); margin-top:6px; }
+  .new { border-color:var(--blue); background:var(--blue-bg); }
+  .new h2 { color:var(--blue); }
+  .newtext { color:var(--blue); }
+  .model { background:#e8ecfb; }
+  .api { background:var(--yellow); }
+  .risk { border-color:var(--red); background:var(--red-bg); }
+  .risk h2 { color:var(--red); }
+  .harness { border:2px dashed #777; border-radius:14px; padding:14px; background:var(--panel); position:relative; }
+  .harness > .label { position:absolute; top:-12px; left:16px; background:#fff; padding:0 8px; color:#555; font-weight:700; font-size:14px; }
+  .flow { display:flex; flex-direction:column; gap:6px; }
+  .arrow { text-align:center; font-weight:700; color:#333; font-size:13px; }
+  .arrow b { font-size:19px; display:block; line-height:1; }
+  .pill { display:inline-block; width:25px; height:25px; line-height:25px; text-align:center; border-radius:50%; background:#222; color:#fff; font-weight:700; font-size:13px; margin-right:6px; }
+  .pill.r { background:var(--red); }
+  .pill.l { background:#222; }
+  .bottom { display:grid; grid-template-columns: 1fr 1fr 1fr; gap:22px; margin-top:20px; }
+  .bottom .box { font-size:14px; }
+  .green { color:var(--green); font-weight:700; }
+  .redtxt { color:var(--red); font-weight:700; }
+  .row2 { display:grid; grid-template-columns: 1fr 1fr; gap:12px; }
+  .note { font-size:13px; color:var(--muted); }
+</style>
+</head>
+<body>
+<h1>HomeSet agent architecture (version 5, as built)</h1>
+<p class="sub">One request:  message in, plan out.  Code decides before the model is called and again after it writes;  the model writes the plan in between.  <b>Blue = new since version 4</b> (the health question, 2026-10-19).  Red marks where prompt injection gets in and where the design is weakest.  Valerie Zandoli and Yadan Taino.  Drawn from the code at commit cef5ee2.  This replaces version 4, which did not show the health question.</p>
+
+<div class="grid">
+
+  <!-- LEFT COLUMN -->
+  <div class="col">
+    <div class="box"><h2><span class="pill r">1</span>USER MESSAGE</h2>
+      <p>minutes, equipment, and focus area, in one sentence.  In a swap session:  the request to change one exercise.</p>
+      <p class="code">Where it comes from:  the command line (<i>python -m homeset</i>) or the chat page (<i>python -m homeset.web</i>, this computer only).</p></div>
+    <div class="box new"><h2>WHERE THE HEALTH QUESTION IS ANSWERED</h2>
+      <ul>
+        <li><b>Command line:</b>  you answer at a terminal, up to two tries.  With no terminal it prints the question and stops;  <i>--no-health-issues</i> says in the command that there is none.</li>
+        <li><b>Chat page:</b>  a "None of these" button, or type.  A reloaded page is a new conversation.</li>
+      </ul></div>
+    <div class="box"><h2><span class="pill r">3</span>SAVED PLAN FILE</h2>
+      <p>saved_plan.json:  one plan and its time stamp;  no symptoms, no request text.  Owner-only, kept out of git.</p>
+      <p>On load it is ignored if it is a link, belongs to another user, can be changed by others, is over 32 KB, or is not a valid plan.</p></div>
+    <div class="box"><h2>SAVE CHECKPOINT</h2>
+      <p>The model has no tool for the write.  A person types the exact answer "yes" at a terminal, or clicks "Yes, save" on the chat page.  Anything else, or no terminal, saves nothing.</p>
+      <p>It shows the saved plan beside the new one and asks once.  The approval covers one exact text;  the write is atomic.</p>
+      <p class="code">homeset/saved_plan.py</p></div>
+    <div class="box"><h2>TO THE USER</h2>
+      <p>a plan, only after every output check passes;<br>or, with no plan:  the hand-off sentence, a fixed question, or an error message.</p></div>
+    <div class="box"><h2>REQUEST TRACE</h2>
+      <p>Each step is recorded in order:  the safety check, the health question, every model call, every tool call, the "(assumed)" change, every check, and the outcome.  <i>--trace</i> prints it.</p></div>
+  </div>
+
+  <!-- MIDDLE COLUMN: the harness -->
+  <div class="harness"><span class="label">HARNESS (the code that runs the loop)</span>
+    <div class="flow">
+      <div class="box new"><h2>SAFETY CHECKS IN CODE (run first;  the model is not called when one fires)</h2>
+        <ol>
+          <li><b>Health words</b> (pain, injury, surgery, pregnancy, a medical condition) anywhere in the conversation:  the exact hand-off sentence goes to the user.  A negated word ("no pain") does not fire.</li>
+          <li><b>Vague wording</b> ("feels off", "bothering me"):  one fixed question, "Is that ordinary soreness or tiredness, or does it hurt?"  A second vague message:  the hand-off.</li>
+          <li class="newtext"><b>NEW — the health question, before the first plan:</b>  "Before I plan:  do you have any pain, injury, surgery, pregnancy, or medical condition I should know about?  Reply "none" or tell me."  Only a short list of exact answers ("none", "no", "no pain", ...) lets the request go on.  A health word in the answer:  the hand-off.  An unclear answer:  asked once more, then the hand-off.</li>
+          <li class="newtext"><b>Skips the question:</b>  a request that says "no pain" or "no injuries";  a swap of a saved plan from the last 7 days;  a user who answered the vague question.</li>
+        </ol>
+        <p>Anything else goes on to the model.</p>
+        <p class="code">homeset/triggers.py (find_trigger, find_vague) · homeset/screen.py (the health question) · homeset/harness.py (handle_request)</p></div>
+      <div class="arrow"><b>↓</b>no trigger, health question settled:  the request goes on (with the earlier request, if a question was answered)</div>
+
+      <div class="box model"><h2>MODEL + SYSTEM PROMPT</h2>
+        <p>Decides:</p>
+        <ol>
+          <li>focus and equipment labels, from the fixed lists</li>
+          <li>which exercises, from the tool results only</li>
+          <li>sets, reps, and rest;  writes the plan</li>
+          <li>the fixed messages for missing minutes, no match, too few exercises, or wger down</li>
+        </ol>
+        <p>Prompt step 1 stays as a second layer for health wording that neither code list knows:  a body part or symptom the user calls fine is not a symptom.  In a swap session it receives the saved plan once, as data.</p></div>
+      <div class="arrow"><b>↓</b>plan written</div>
+
+      <div class="box"><h2>"(ASSUMED)" MARKER (code)</h2>
+        <p>Code writes "(assumed)" on line 1 after any equipment or focus the user did not name, and removes any marker the model wrote.  It runs before the checks.</p>
+        <p class="code">homeset/assumed.py</p></div>
+      <div class="arrow"><b>↓</b></div>
+
+      <div class="box"><h2>OUTPUT CHECKS IN CODE (plans only, before the user sees it)</h2>
+        <ol>
+          <li>The format is exact (line 1, numbered lines, total line).</li>
+          <li>The last line is the exact safety line.</li>
+          <li>Every exercise name came back in this request's results.</li>
+          <li>The user owns all the equipment:  the wger tag and the gear the name implies (bodyweight is always allowed).</li>
+          <li>No blocked advanced move (pull-ups, plank-to-row).</li>
+          <li>No kettlebell move above 8 reps per set.</li>
+          <li>The stated total matches the code's own sum.</li>
+          <li>The total is within 5 minutes of the request.</li>
+        </ol>
+        <p>One failed check sends the plan back to the model once;  a second failure shows a visible error and no plan.</p>
+        <p class="code">homeset/checks.py · gear.py · advanced.py · rep_cap.py</p></div>
+    </div>
+  </div>
+
+  <!-- RIGHT COLUMN -->
+  <div class="col">
+    <div class="box"><h2>TOOL RUNNER (code)</h2>
+      <p>The model has two tools and no others:  search_exercises(focus, equipment) and calculate_plan_time(exercises).</p>
+      <p>Cap:  10 tool calls per request;  a refused call counts.  Argument caps:  a list of at most 20 items;  an equipment string of at most 60 characters.</p>
+      <p>Labels are checked against the fixed lists and turned into wger filters by code.  An unknown label is an error, and no search runs.</p>
+      <p>wger:  GET only, 10 s timeout, 1 retry, 30 s at most per search.</p></div>
+    <div class="box api"><h2><span class="pill r">2</span>wger EXERCISE API</h2>
+      <p>read-only;  names and text can be edited by strangers.  One search per muscle in the focus label, five at most.</p></div>
+    <div class="box"><h2>CONTEXT FEEDING (code)</h2>
+      <p>Builds one clean record per exercise:  English name, equipment, muscles, category, and the ids that the checks use.  Drops every other field, including descriptions.</p>
+      <p>Drops a name that is not a short label (the injection filter), an advanced move, a repeat, and any exercise that needs gear the user lacks.  Marks a cut list:  "showing N of M".</p>
+      <p class="code">homeset/wger.py · gear.py · advanced.py</p></div>
+    <div class="box risk"><h2>TRUNCATION POINT</h2>
+      <p>wger returns 20 exercises per page.  Code follows the next-page link up to 40 rows for each muscle and marks any cut, so the model can see that the list is partial.</p>
+      <p><b>Still open:</b>  rows past 40 are never seen, so a cut list can hide better exercises.</p></div>
+    <div class="box"><h2>THE CHAT PAGE'S EXTRAS</h2>
+      <p>127.0.0.1 only;  other Host names and other sites' Origins are refused;  body and message sizes are capped.</p>
+      <p><b>/showcase</b>:  a 30-second self-playing opener with sample plans from real runs.  It makes no agent call and needs no key.</p>
+      <p class="code">homeset/web.py · web_page.html · showcase.html</p></div>
+  </div>
+</div>
+
+<div class="bottom">
+  <div class="box"><h2>THE LOOP STOPS WHEN</h2>
+    <ol>
+      <li>A plan passes every output check.</li>
+      <li>A health word is found:  the hand-off sentence, and the model is not called.</li>
+      <li>Vague wording:  the one fixed question, and the model is not called.  A second vague message:  the hand-off.</li>
+      <li class="newtext">The health question is unanswered or unclear twice:  the hand-off.</li>
+      <li>The regenerated plan fails a check:  a visible error message, and no plan.</li>
+      <li>The model asks for an 11th tool call:  a visible message, and no plan.</li>
+      <li>The model writes one of its fixed messages:  the harness passes it on without the output checks.</li>
+    </ol></div>
+  <div class="box"><h2>THE LOOPS (letters in the flow)</h2>
+    <p><b>A  Replan:</b>  the prompt asks the model to land within 2 minutes of the request.  If calculate_plan_time shows more, the model changes the plan and calls the tools again, up to 2 more times.  Only the prompt asks for this;  code only caps the request at 10 tool calls.</p>
+    <p><b>B  Failed output check:</b>  code sends the list of failed checks back to the model once.  Code writes the "(assumed)" marker again on the new plan.</p>
+    <p><b>C  Save and swap, in a later session:</b>  after a plan, a "yes" saves it.  A later swap run loads the file and gives it to the model once, as data, with the swap request.  The same safety checks and output checks apply.</p>
+    <p class="newtext"><b>D  Code-fired questions:</b>  the vague question and the health question are asked by code.  The answer goes to the model together with the earlier request, after the safety check reads the answer first.</p></div>
+  <div class="box"><h2>HOW TO READ THIS</h2>
+    <p class="redtxt">1, 2, 3  Where prompt injection gets in:</p>
+    <p>1 the user message (and the answer to a question);  2 wger text;  3 the saved plan file (a swap session).</p>
+    <p class="green">Harness catches:</p>
+    <p>health words before the model;  an unclear health answer;  labels off the fixed lists;  invented names;  gear the user lacks;  advanced moves;  kettlebell reps over 8;  a wrong total;  oversized tool arguments;  tool failure.</p>
+    <p class="redtxt">Harness does not catch:</p>
+    <p>intent in the message (the prompt carries it);  injected words inside a plausible exercise name;  an injury in wording neither list knows (only prompt step 1 stands there);  a false "none" (the answer is self-reported);  a model reply that is not a plan (it skips the output checks).</p>
+    <p class="newtext">Blue border and blue text = new in version 5.  <span style="color:#1b1b22">Pale blue fill = the model.</span></p></div>
+</div>
+</body>
+</html>
