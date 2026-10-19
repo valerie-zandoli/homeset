@@ -7,7 +7,7 @@ Example:  "I have 20 minutes, a mat, and dumbbells.  Work on legs."
 HomeSet is a single-role AI agent built by Valerie Zandoli and Yadan Taino for Pursuit L2 Cycle 2.
 
 - **Spec:**  [HomeSet Agent PRD](https://docs.google.com/document/d/1aQLT7d2mdhh-Bz-7_5RyaNbPUfcpwV9hcpnmFPKgIxQ/edit) (the Google Doc is the source of truth; this repo follows it)
-- **Design:**  `docs/architecture-v3.png` (detailed) and `docs/architecture-v1.png` (simple)
+- **Design:**  `docs/architecture-v4.png` (as built, drawn from the code on 2026-10-19), `docs/architecture-v3.png` (the design before the build) and `docs/architecture-v1.png` (simple)
 - **Data:**  the free [wger](https://wger.de/en/software/api) exercise database (read-only)
 - **Pitch:**  `docs/pitch-script.md` (the design pitch for 2026-10-19, with timing and the cut order)
 - **Access:**  `docs/access-register.md` (every grant, the job step that needs it, where each limit is enforced in code, and the open gaps)
