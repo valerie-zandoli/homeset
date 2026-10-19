@@ -192,3 +192,13 @@ def test_the_trace_clips_a_long_equipment_string():
     search("legs", ["Z" * 5000])
     call = [e for e in state.trace.as_list() if e["event"] == "tool_call"][0]
     assert len(call["arguments"]["equipment"][0]) < 200
+
+
+@pytest.mark.parametrize("module", ["agent.py", "harness.py"])
+def test_the_model_side_modules_never_import_the_chat_page(module):
+    """The chat page (homeset/web.py) sits in front of run_once();  nothing on the model's side may reach back to it."""
+    import re
+    from pathlib import Path
+
+    source = (Path(__file__).resolve().parents[1] / "homeset" / module).read_text()
+    assert not re.search(r"^\s*(from\s+\.\s+import\s+web\b|from\s+\.web\b|import\s+homeset\.web\b)", source, re.MULTILINE)
