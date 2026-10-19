@@ -60,6 +60,23 @@ pip install -r requirements-dev.txt
 cp .env.example .env        # then put your personal API key in .env
 ```
 
+**On Windows (PowerShell).**  The code has no macOS-only calls, and the file-permission checks skip themselves where Windows reports no owners.  The commands below are written but have not been run on a Windows machine:
+
+```powershell
+git clone https://github.com/valerie-zandoli/homeset.git
+cd homeset
+py -3.12 -m venv .venv
+.venv\Scripts\Activate.ps1
+pip install -r requirements-dev.txt
+copy .env.example .env      # then put your personal API key in .env
+```
+
+- If PowerShell refuses to run `Activate.ps1`, run `Set-ExecutionPolicy -Scope Process RemoteSigned` once in that window, then activate again.
+- Use Python 3.12 (3.9 fails the install).  `py -3.12 --version` shows whether it is installed.
+- Run the save checkpoint in a normal terminal window (Windows Terminal, PowerShell, or Command Prompt, or the integrated terminal in VS Code).  A pane that is not a real terminal prints "Not saved:  no one is here to confirm", which is correct and saves nothing.
+- To keep the demo away from a real saved plan:  `$env:HOMESET_SAVED_PLAN = "$env:TEMP\homeset_demo_plan.json"`, then `Remove-Item $env:HOMESET_SAVED_PLAN -ErrorAction SilentlyContinue`.
+- `python -m pytest` should pass with about 15 skips (the file-owner and permission tests); a run that simulates Windows by hiding `os.getuid` gave 491 passed and 15 skipped on 2026-10-19.
+
 ## Run
 
 ```bash
