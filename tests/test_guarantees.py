@@ -6,9 +6,11 @@ friendlier prompt or a hostile message cannot change what reaches wger or the mo
 
 import json
 
+import pytest
 import requests
 
 from homeset import wger
+from homeset.agent import build_agent
 from homeset.harness import RequestState, make_tools
 
 from test_wger import FIXTURE, Resp, no_sleep, raw
@@ -82,3 +84,17 @@ def test_a_next_link_to_another_host_is_not_followed():
 
     wger.search_exercises("chest", ["dumbbells"], get=get, sleep=no_sleep)
     assert all(url.startswith(wger.BASE_URL) for url in seen)
+
+
+def test_the_agent_registers_exactly_the_two_named_tools(monkeypatch):
+    """The model's whole reach is these two tools (docs/access-register.md).
+
+    `test_the_model_still_has_exactly_two_tools` counts what `make_tools` returns; this test reads what
+    the Strands Agent registers, so a tool added inside `build_agent` fails here.  A new tool needs a
+    new row in the register and a deliberate edit to this list.  No model call is made.
+    """
+    pytest.importorskip("strands")
+    pytest.importorskip("litellm")
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-test-not-a-real-key")  # load_dotenv() does not override this
+    agent = build_agent(RequestState("I have 20 minutes."))
+    assert sorted(agent.tool_names) == ["calculate_plan_time", "search_exercises"]
