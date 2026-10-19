@@ -12,6 +12,18 @@ HomeSet is a single-role AI agent built by Valerie Zandoli and Yadan Taino for P
 - **Pitch:**  `docs/pitch-script.md` (the design pitch for 2026-10-19, with timing and the cut order)
 - **Access:**  `docs/access-register.md` (every grant, the job step that needs it, where each limit is enforced in code, and the open gaps)
 
+## Who it is for
+
+HomeSet is a workout planner for the at-home fitness industry.  Its user is a busy adult who works out at home in a short window (the PRD targets 20 to 30 minutes) with whatever equipment they own.  One plain-language request goes in; one numbered plan comes out, built only from exercises in the wger database.
+
+## Out of scope (version 1)
+
+- **Medical advice.**  HomeSet never diagnoses, treats, or trains through pain.  Pain, injury, surgery, pregnancy, or a medical condition gets one fixed hand-off sentence from code, and no plan.
+- **Timed moves**, such as planks.  wger does not mark which exercises are timed, so every exercise is counted by reps.
+- **Accounts, sign-in, and a separate approver role.**  The person at the terminal is the user and the approver (version 2).
+- **Any model tool beyond two.**  The model can search wger and add up time; it has no email, calendar, file, shell, or web access (`docs/access-register.md`).
+- **Workout history.**  HomeSet keeps one saved plan, replaced only by a typed "yes".
+
 ## Status (updated 2026-10-16)
 
 | Part | State |
