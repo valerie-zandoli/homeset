@@ -33,6 +33,38 @@ def test_extract_minutes():
     assert extract_minutes("work on legs") is None
 
 
+def test_extract_minutes_reads_whole_numbers_written_in_words():
+    # Found 2026-10-19 while drawing diagram v4:  "twenty minutes" returned None, so the time check
+    # fell back to the plan's own line 1 and compared the model's claim with itself.
+    assert extract_minutes("I have twenty minutes and a mat") == 20
+    assert extract_minutes("about Twenty-Five min, no equipment") == 25
+    assert extract_minutes("a forty five minute workout") == 45
+    assert extract_minutes("a forty-five-minute workout") == 45
+    assert extract_minutes("fifteen minutes on the mat") == 15
+    assert extract_minutes("ten mins please") == 10
+    assert extract_minutes("sixteen minutes") == 16  # not "six" plus a stray "teen"
+    assert extract_minutes("I have one hour") == 60
+    assert extract_minutes("two hours") == 120
+    assert extract_minutes("one hour and fifteen minutes") == 75
+    assert extract_minutes("1 hour and twenty minutes") == 80  # digits and words together
+
+
+def test_extract_minutes_ignores_number_words_that_are_not_minutes():
+    assert extract_minutes("I am thirty years old.  Legs.") is None
+    assert extract_minutes("three sets of twelve reps") is None
+    assert extract_minutes("sixteen reps and twenty squats") is None
+    assert extract_minutes("work on legs") is None
+    assert extract_minutes("a hundred minutes") is None  # only 1 to 69 is read
+
+
+def test_the_time_check_uses_the_minutes_written_in_words_not_the_plans_own_line_1():
+    state = RequestState("I have twenty minutes and dumbbells.  Chest.")
+    assert state.requested_minutes == 20
+    prime(state)
+    outcome = handle_request(state.user_message, lambda text: GOOD_PLAN, state)  # a 3 minute plan
+    assert outcome.kind == "error" and any(f.startswith("time:") and "20" in f for f in outcome.failures)
+
+
 def prime(state):
     """Run the search tool once so the state knows which exercises were returned."""
     search_tool, _ = make_tools(state, mock_search)

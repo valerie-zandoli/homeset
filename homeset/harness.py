@@ -145,8 +145,30 @@ _MINUTES = re.compile(r"(\d+(?:\.\d+)?)\s*-?\s*(?:minutes?|mins?)\b", re.IGNOREC
 _HOURS = re.compile(r"(\d+(?:\.\d+)?)\s*-?\s*(?:hours?|hrs?)\b", re.IGNORECASE)
 
 
+_NUMBER_WORDS = {
+    "one": 1, "two": 2, "three": 3, "four": 4, "five": 5, "six": 6, "seven": 7, "eight": 8, "nine": 9,
+    "ten": 10, "eleven": 11, "twelve": 12, "thirteen": 13, "fourteen": 14, "fifteen": 15, "sixteen": 16,
+    "seventeen": 17, "eighteen": 18, "nineteen": 19, "twenty": 20, "thirty": 30, "forty": 40,
+    "fifty": 50, "sixty": 60,
+}
+_TENS = "twenty|thirty|forty|fifty|sixty"
+_ONES = "one|two|three|four|five|six|seven|eight|nine"
+# "twenty", "twenty five", "twenty-five", "fifteen":  a whole number written in words, 1 to 69.
+_WORD_NUMBER = rf"(?:(?:{_TENS})(?:[ -](?:{_ONES}))?|(?:{'|'.join(list(_NUMBER_WORDS)[9:19])})|(?:{_ONES}))"
+_WORD_MINUTES = re.compile(rf"\b({_WORD_NUMBER})\s*-?\s*(?:minutes?|mins?)\b", re.IGNORECASE)
+_WORD_HOURS = re.compile(rf"\b({_WORD_NUMBER})\s*-?\s*(?:hours?|hrs?)\b", re.IGNORECASE)
+
+
+def _number_from_words(words: str) -> int:
+    return sum(_NUMBER_WORDS[part] for part in re.split(r"[ -]", words.lower()))
+
+
 def extract_minutes(message: str) -> float | None:
-    """Minutes the user asked for, read by code (not by the model), or None."""
+    """Minutes the user asked for, read by code (not by the model), or None.
+
+    Reads digits ("20 minutes") and whole numbers in words ("twenty minutes", "twenty-five minutes").
+    A message with neither gives None, and the time check then falls back to the plan's own line 1.
+    """
     total = 0.0
     found = False
     for m in _MINUTES.finditer(message):
@@ -154,6 +176,12 @@ def extract_minutes(message: str) -> float | None:
         found = True
     for m in _HOURS.finditer(message):
         total += float(m.group(1)) * 60
+        found = True
+    for m in _WORD_MINUTES.finditer(message):
+        total += _number_from_words(m.group(1))
+        found = True
+    for m in _WORD_HOURS.finditer(message):
+        total += _number_from_words(m.group(1)) * 60
         found = True
     if re.search(r"\bhalf an hour\b", message, re.IGNORECASE):
         return 30.0
