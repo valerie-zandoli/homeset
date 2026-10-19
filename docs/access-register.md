@@ -15,7 +15,7 @@ Draft 2026-10-19.  One row per grant.  A grant with no row has no reason to stay
 | **`calculate_plan_time`** (pure arithmetic) | Total minutes for a plan | The model would do the time math itself | No network, no files; shares the cap below | `tests/test_plan_time.py` |
 | **Tool-call cap** (10 per request, 1 regeneration) | Keeps one request from looping | Not a grant; it limits the two tools above | `MAX_TOOL_CALLS` in `harness.py`; the 11th call returns `tool_call_limit` | `tests/test_harness.py` |
 | **Saved plan write** (`saved_plan.json`) | Save a plan and swap in a later session | No saved plan; every session starts fresh | **The model has no tool for it:**  `agent.py` and `harness.py` never import `saved_plan`.  `write()` refuses without an `Approval` for the same hash; the approval comes only from the exact answer "yes" at a terminal; the write is atomic and owner-only.  On read, a link, another owner's file, a file others can change, a file over 32 KB, or an odd `saved_at` is ignored with a reason | `test_the_model_side_modules_never_import_the_write`; the `test_write_refuses_*` tests; break-it B3 to B7 |
-| **Run logs** (`runs/`) | Eval results and traces for debugging | Evals still run; nothing is saved for later reading | Git-ignored (`.gitignore` line 7).  **Gap:**  on this machine `runs/` is mode 755 and the files are 644, so other local users could read request text | `git check-ignore`; permissions checked 2026-10-19 |
+| **Run logs** (`runs/`) | Eval results and traces for debugging | Evals still run; nothing is saved for later reading | Git-ignored (`.gitignore` line 7).  On this machine `runs/` was mode 755 and the files 644; fixed 2026-10-19 (folder 700, files 600).  The 700 folder blocks other local users even when a new run file is created as 644 | `git check-ignore`; permissions checked 2026-10-19 before and after the fix |
 | **Repo write access** (Yadan, collaborator on `valerie-zandoli/homeset`, public) | Pair work on the code | Yadan cannot push | GitHub collaborator setting, outside the code; from the 2026-10-14 invite, not re-checked | Not tested |
 
 ## Withheld on purpose
@@ -24,7 +24,7 @@ Shell, file, and network tools for the model (beyond wger); email, calendar, and
 
 ## Enforcement gaps (fix, accept, or decide)
 
-1. **`runs/` is readable by other local users.**  Fix:  `chmod 700 runs` and `chmod 600 runs/*`; the files hold request text.
+1. **Fixed 2026-10-19:  `runs/` was readable by other local users.**  The folder is now mode 700 and the files 600; the files hold request text.  Repeat on any new machine, because a fresh clone creates `runs/` with default permissions.
 2. **No test pins the model's tool list to exactly two tools.**  Add one so a third tool cannot appear without a failing test and a new row here.
 3. **`.env` mode is checked by hand only.**  Optional:  warn at startup when the mode is not 600.
 4. **A demo machine holds a copy of the key.**  Decide when to delete it and whether to ask Pursuit to rotate the key after the 2026-10-19 demo.
