@@ -78,6 +78,20 @@ footer { font-size: 12px; color: var(--muted); text-align: center; margin-top: 1
 @keyframes blink { 0%, 100% { opacity: .3 } 50% { opacity: 1 } }
 @keyframes rise { from { transform: translateY(6px); opacity: .6 } to { transform: none; opacity: 1 } }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; } }
+.ex li.canplay { cursor: pointer; }
+.ex li.canplay:hover { background: var(--line); }
+.ex li .move { grid-column: 1 / -1; margin-top: 6px; background: var(--surface); border-radius: 10px; padding: 8px 10px; cursor: default; }
+.ex li .move[hidden] { display: none; }
+.move svg { display: block; width: 100%; max-height: 190px; }
+.move .floor { stroke: var(--line); stroke-width: 2; stroke-linecap: round; }
+.move polyline { fill: none; stroke: var(--accent); stroke-width: 5; stroke-linecap: round; stroke-linejoin: round; }
+.move polyline.far { stroke: var(--muted); opacity: .6; }
+.move circle { fill: var(--surface); stroke: var(--accent); stroke-width: 4; }
+.move rect.weight { fill: var(--ink); }
+.move .cue { margin: 6px 2px 0; font-size: 13px; font-weight: 700; }
+.move .note { margin: 2px 2px 0; font-size: 11px; color: var(--muted); }
+.stills { display: flex; gap: 8px; }
+.stills figure { margin: 0; flex: 1; text-align: center; font-size: 11px; color: var(--muted); }
 </style>
 </head>
 <body>
@@ -129,6 +143,250 @@ async function post(url, body) {
   return r.json();
 }
 
+// ---- Exercise movement drawings:  a side-view stick figure drawn in code (no images, no network). ----
+// Click an exercise in a plan card and a looping drawing shows the general motion.  The exercise name
+// is only matched against the patterns below;  it is never written into the page as HTML.
+const SVGNS = "http://www.w3.org/2000/svg";
+const G = 110;  // the floor line, in the drawing's own units
+const LEN = { thigh: 30, shin: 30, upper: 20, fore: 18, torso: 34, head: 13 };
+const rad = d => d * Math.PI / 180;
+
+// Two-bone limb:  where the knee or elbow sits when the hip or shoulder and the foot or hand are fixed.
+// dir = +1 bends toward the right of the drawing (a knee forward), -1 toward the left.
+function ik(a, b, l1, l2, dir) {
+  let dx = b[0] - a[0], dy = b[1] - a[1], d = Math.hypot(dx, dy) || 0.001;
+  const far = l1 + l2 - 0.5, near = Math.abs(l1 - l2) + 0.5;
+  const k = d > far ? far / d : d < near ? near / d : 1;
+  dx *= k; dy *= k; d *= k;
+  const ux = dx / d, uy = dy / d, along = (d * d + l1 * l1 - l2 * l2) / (2 * d);
+  const h = Math.sqrt(Math.max(0, l1 * l1 - along * along));
+  let px = -uy, py = ux;
+  if (Math.abs(px) < 0.001) { if (py > 0) { px = -px; py = -py; } }
+  else if (px * dir < 0) { px = -px; py = -py; }
+  return { mid: [a[0] + ux * along + px * h, a[1] + uy * along + py * h], end: [a[0] + dx, a[1] + dy] };
+}
+// A limb is one of:  {a1, a2} angles from straight down (positive = forward), {mid, end} fixed joints,
+// or {end, bend} a target for the foot or hand.
+function limb(root, s, l1, l2, bend) {
+  if ("a1" in s) {
+    const m = [root[0] + l1 * Math.sin(rad(s.a1)), root[1] + l1 * Math.cos(rad(s.a1))];
+    return { mid: m, end: [m[0] + l2 * Math.sin(rad(s.a2)), m[1] + l2 * Math.cos(rad(s.a2))] };
+  }
+  if (s.mid) return { mid: s.mid, end: s.end };
+  return ik(root, s.end, l1, l2, s.bend ?? bend);
+}
+function solve(p) {
+  const tx = p.sh[0] - p.hip[0], ty = p.sh[1] - p.hip[1], tl = Math.hypot(tx, ty) || 1;
+  const hd = p.headDir || [tx / tl, ty / tl], hl = Math.hypot(hd[0], hd[1]) || 1;
+  return {
+    hip: p.hip, sh: p.sh, foot: !!p.foot,
+    head: [p.sh[0] + hd[0] / hl * LEN.head, p.sh[1] + hd[1] / hl * LEN.head],
+    legs: p.legs.map(s => limb(p.hip, s, LEN.thigh, LEN.shin, 1)),
+    arms: p.arms.map(s => limb(p.sh, s, LEN.upper, LEN.fore, -1)),
+  };
+}
+function mix(a, b, t) {
+  if (typeof a === "number") return a + (b - a) * t;
+  if (Array.isArray(a)) return a.map((v, i) => mix(v, b[i], t));
+  if (a && typeof a === "object") { const o = {}; for (const k in a) o[k] = k in b ? mix(a[k], b[k], t) : a[k]; return o; }
+  return a;
+}
+
+const hang = { a1: 4, a2: 4 }, down = { a1: 0, a2: 0 };
+const stand = (x = {}) => ({ hip: [100, 51], sh: [100, 17], legs: [{ end: [104, G] }, { end: [96, G] }], arms: [hang, hang], foot: true, ...x });
+const lying = (x = {}) => ({ hip: [80, 105], sh: [48, 105], legs: [{ end: [106, G] }, { end: [110, G] }], arms: [{ a1: 90, a2: 90 }, { a1: 90, a2: 90 }], ...x });
+const bent = (x = {}) => ({ hip: [82, 58], sh: [114, 46], legs: [{ end: [100, G] }, { end: [96, G] }], arms: [down, down], foot: true, ...x });
+const quad = (x = {}) => ({ hip: [100, 80], sh: [132, 72], legs: [{ end: [72, 106] }, { end: [70, 104] }], arms: [down, down], ...x });
+const prone = { a1: 90, a2: 90 };
+
+const P = {
+  squat: { cue: "Feet about shoulder-width apart.  Sit your hips back and down with your chest up, then stand tall.",
+    a: stand(), b: { hip: [76, 78], sh: [96, 50], legs: [{ end: [104, G] }, { end: [98, G] }], arms: [{ a1: 88, a2: 88 }, { a1: 88, a2: 88 }], foot: true } },
+  lunge: { cue: "Step one foot back and lower until both knees bend.  Push through your front foot to stand.",
+    a: stand({ hip: [110, 51], sh: [110, 17], legs: [{ end: [114, G] }, { end: [106, G] }] }),
+    b: { hip: [102, 76], sh: [102, 42], legs: [{ end: [126, G] }, { end: [76, 106] }], arms: [hang, hang], foot: true } },
+  hinge: { cue: "Push your hips back with a flat back until you feel your legs stretch, then stand tall.",
+    a: stand(), b: { hip: [80, 56], sh: [112, 44], legs: [{ end: [104, G] }, { end: [98, G] }], arms: [down, down], foot: true } },
+  rdl1: { cue: "Balance on one leg.  Lean forward as the other leg reaches back, then return.",
+    a: stand({ legs: [{ end: [100, G] }, { a1: 4, a2: 4 }] }),
+    b: { hip: [82, 58], sh: [114, 46], legs: [{ end: [100, G] }, { a1: -90, a2: -90 }], arms: [down, down], foot: true } },
+  calf: { cue: "Rise up onto your toes, pause for a moment, then lower slowly.",
+    a: stand(), b: { hip: [100, 43], sh: [100, 9], legs: [{ end: [104, 101] }, { end: [96, 101] }], arms: [hang, hang], foot: true } },
+  bridge: { cue: "Lie on your back with your knees bent.  Press through your heels to lift your hips, then lower.",
+    a: lying({ arms: [{ a1: 88, a2: 88 }, { a1: 88, a2: 88 }] }),
+    b: lying({ hip: [78, 84], arms: [{ a1: 84, a2: 84 }, { a1: 84, a2: 84 }] }) },
+  bridge1: { cue: "Lie on your back with one knee bent.  Lift your hips while the other leg points up, then lower.",
+    a: lying({ arms: [{ a1: 88, a2: 88 }, { a1: 88, a2: 88 }], legs: [{ end: [106, G] }, { a1: 140, a2: 21 }] }),
+    b: lying({ hip: [78, 84], arms: [{ a1: 84, a2: 84 }, { a1: 84, a2: 84 }], legs: [{ end: [106, G] }, { a1: 140, a2: 140 }] }) },
+  pushup: { cue: "Hands under your shoulders and your body in one straight line.  Lower your chest, then press up.",
+    a: { hip: [85, 86], sh: [116, 72], legs: [{ end: [30, G], bend: -1 }, { end: [32, G], bend: -1 }], arms: [{ end: [116, G] }, { end: [118, G] }] },
+    b: { hip: [89, 102], sh: [123, 96], legs: [{ end: [30, G], bend: -1 }, { end: [32, G], bend: -1 }], arms: [{ end: [116, G] }, { end: [118, G] }] } },
+  kneepush: { cue: "The same push-up with your knees on the floor.  Keep a straight line from your knees to your head.",
+    a: { hip: [76, 90], sh: [104, 72], legs: [{ mid: [52, G], end: [27, 92] }, { mid: [54, G], end: [29, 92] }], arms: [{ end: [104, G] }, { end: [106, G] }] },
+    b: { hip: [81, 102], sh: [115, 96], legs: [{ mid: [52, G], end: [27, 92] }, { mid: [54, G], end: [29, 92] }], arms: [{ end: [104, G] }, { end: [106, G] }] } },
+  plank: { cue: "Rest on your forearms with a straight line from head to heels.  Hold it, and keep your hips from sagging.",
+    a: { hip: [88, 95], sh: [122, 88], legs: [{ end: [30, G], bend: -1 }, { end: [32, G], bend: -1 }], arms: [{ mid: [122, G], end: [140, G] }, { mid: [122, G], end: [140, G] }] },
+    b: { hip: [88, 94], sh: [122, 87], legs: [{ end: [30, G], bend: -1 }, { end: [32, G], bend: -1 }], arms: [{ mid: [122, G], end: [140, G] }, { mid: [122, G], end: [140, G] }] } },
+  dip: { cue: "Hands behind you on the floor.  Bend your elbows to lower your hips, then press back up.",
+    a: { hip: [98, 84], sh: [70, 74], headDir: [-0.2, -1], legs: [{ end: [126, G] }, { end: [124, G] }], arms: [{ end: [70, G] }, { end: [72, G] }] },
+    b: { hip: [98, 98], sh: [72, 92], headDir: [-0.2, -1], legs: [{ end: [126, G] }, { end: [124, G] }], arms: [{ end: [70, G] }, { end: [72, G] }] } },
+  crunch: { cue: "Lie on your back with your knees bent.  Curl your shoulders up off the floor, then lower.",
+    a: lying({ arms: [{ mid: [56, 92], end: [42, 98] }, { mid: [58, 92], end: [44, 98] }] }),
+    b: lying({ sh: [62, 80], arms: [{ mid: [68, 66], end: [57, 70] }, { mid: [70, 66], end: [59, 70] }] }) },
+  legraise: { cue: "Lie flat.  Raise your straight legs up toward the ceiling, then lower them slowly.",
+    a: lying({ legs: [{ a1: 88, a2: 90 }, { a1: 88, a2: 90 }], arms: [{ a1: 88, a2: 88 }, { a1: 88, a2: 88 }] }),
+    b: lying({ legs: [{ a1: 172, a2: 174 }, { a1: 170, a2: 172 }], arms: [{ a1: 88, a2: 88 }, { a1: 88, a2: 88 }] }) },
+  revcrunch: { cue: "Lie on your back with your knees pulled up.  Curl your knees toward your chest and lift your hips a little, then lower.",
+    a: lying({ legs: [{ a1: 170, a2: 92 }, { a1: 168, a2: 92 }], arms: [{ a1: 88, a2: 88 }, { a1: 88, a2: 88 }] }),
+    b: lying({ hip: [84, 98], legs: [{ a1: 192, a2: 110 }, { a1: 190, a2: 110 }], arms: [{ a1: 88, a2: 88 }, { a1: 88, a2: 88 }] }) },
+  bicycle: { cue: "Bring one knee and the opposite elbow toward each other, then switch sides in a steady rhythm.",
+    a: lying({ sh: [62, 82], hip: [84, 105], legs: [{ a1: 200, a2: 100 }, { a1: 100, a2: 112 }], arms: [{ mid: [70, 70], end: [57, 74] }, { mid: [72, 70], end: [59, 74] }] }),
+    b: lying({ sh: [62, 82], hip: [84, 105], legs: [{ a1: 100, a2: 112 }, { a1: 200, a2: 100 }], arms: [{ mid: [70, 70], end: [57, 74] }, { mid: [72, 70], end: [59, 74] }] }) },
+  birddog: { cue: "On your hands and knees, reach one arm forward and the opposite leg back, then switch sides.",
+    a: quad({ legs: [{ end: [72, 106] }, { a1: 0, a2: -93 }] }), b: quad({ legs: [{ end: [72, 106] }, { a1: -90, a2: -90 }], arms: [down, { a1: 90, a2: 90 }] }) },
+  kickback: { cue: "On your hands and knees, press one foot back and up, squeeze, then bring the knee back under you.",
+    a: quad({ legs: [{ end: [72, 106] }, { a1: 0, a2: -93 }] }), b: quad({ legs: [{ end: [72, 106] }, { a1: -80, a2: -170 }] }) },
+  superman: { cue: "Lie face down.  Lift your arms, chest, and legs a little off the floor, then lower.",
+    a: { hip: [80, 105], sh: [112, 105], legs: [{ a1: -90, a2: -90 }, { a1: -92, a2: -92 }], arms: [prone, prone] },
+    b: { hip: [80, 104], sh: [112, 98], legs: [{ a1: -118, a2: -118 }, { a1: -120, a2: -120 }], arms: [{ a1: 115, a2: 115 }, { a1: 115, a2: 115 }] } },
+  curl: { cue: "Keep your elbows at your sides.  Curl your hands up toward your shoulders, then lower slowly.",
+    a: stand({ arms: [{ a1: 5, a2: 5 }, { a1: 3, a2: 3 }] }), b: stand({ arms: [{ a1: 8, a2: 150 }, { a1: 6, a2: 148 }] }) },
+  press: { cue: "Press the weights straight up from your chest, then lower them with control.",
+    a: lying({ arms: [{ a1: 125, a2: 178 }, { a1: 127, a2: 178 }] }), b: lying({ arms: [{ a1: 180, a2: 180 }, { a1: 180, a2: 180 }] }) },
+  ohpress: { cue: "Start with your hands at your shoulders.  Press the weights overhead, then lower them back.",
+    a: stand({ arms: [{ a1: 12, a2: 165 }, { a1: 10, a2: 165 }] }), b: stand({ arms: [{ a1: 178, a2: 178 }, { a1: 176, a2: 176 }] }) },
+  row: { cue: "Hinge forward with a flat back.  Pull your elbow back toward your hip, then lower the weight.",
+    a: bent({ arms: [down, { a1: 40, a2: 20 }] }), b: bent({ arms: [{ a1: -95, a2: -10 }, { a1: 40, a2: 20 }] }) },
+  tricepkick: { cue: "Hinge forward with your elbow tucked at your side.  Straighten your arm behind you, then bend it.",
+    a: bent({ arms: [{ a1: -75, a2: 0 }, { a1: 40, a2: 20 }] }), b: bent({ arms: [{ a1: -75, a2: -75 }, { a1: 40, a2: 20 }] }) },
+  armraise: { cue: "Raise your arms up and overhead, then lower them slowly.",
+    a: stand({ arms: [{ a1: 6, a2: 6 }, { a1: 4, a2: 4 }] }), b: stand({ arms: [{ a1: 176, a2: 176 }, { a1: 174, a2: 174 }] }) },
+  highknees: { cue: "Lift one knee, then the other, at a steady pace.",
+    a: stand({ legs: [{ a1: 90, a2: 5 }, { a1: 4, a2: 4 }], arms: [{ a1: 60, a2: 120 }, { a1: -30, a2: 60 }] }),
+    b: stand({ legs: [{ a1: 4, a2: 4 }, { a1: 90, a2: 5 }], arms: [{ a1: -30, a2: 60 }, { a1: 60, a2: 120 }] }) },
+};
+
+// First match wins, so the narrower names come before the wider ones.
+const MOVES = [
+  ["rdl1", /single[- ]leg.*(rdl|romanian|deadlift)/],
+  ["bridge1", /single[- ]leg.*(bridge|hip thrust)/],
+  ["bridge", /bridge|hip raise|hip thrust/],
+  ["legraise", /leg raises?/],
+  ["revcrunch", /reverse crunch/],
+  ["bicycle", /bicycle crunch/],
+  ["crunch", /^(?!.*(side|standing)).*(crunch|sit[- ]?up)/],
+  ["hinge", /good morning|deadlift|\brdl\b|romanian/],
+  ["lunge", /lunge|split squat/],
+  ["squat", /squat/],
+  ["calf", /calf raise/],
+  ["kneepush", /knee push/],
+  ["pushup", /push[- ]?up|press[- ]?up/],
+  ["plank", /^(?!.*(side|dynamic)).*plank/],
+  ["dip", /\bdips?\b/],
+  ["superman", /superman/],
+  ["birddog", /bird[- ]?dog/],
+  ["kickback", /kneeling kickback|glute kickback/],
+  ["tricepkick", /tricep.*kickback/],
+  ["curl", /curl|biceps/],
+  ["press", /floor press|bench ?press|hex press|skull ?crusher|\bfly\b/],
+  ["ohpress", /shoulder press|overhead|triceps? extension/],
+  ["row", /one[- ]arm.*row|bent[- ]over row|dumbbell row/],
+  ["armraise", /arm raises?|reach ups?|front raise|lateral raise/],
+  ["highknees", /high knee|\bmarch\b|jog in place/],
+];
+function movementFor(name) {
+  const n = String(name).toLowerCase().replace(/[()]/g, " ");
+  const hit = MOVES.find(([, re]) => re.test(n));
+  return hit ? hit[0] : null;
+}
+
+function makeFigure(weights) {
+  const svg = document.createElementNS(SVGNS, "svg");
+  svg.setAttribute("viewBox", "0 -26 200 142");
+  svg.setAttribute("aria-hidden", "true");
+  const mk = (tag, cls) => { const n = document.createElementNS(SVGNS, tag); if (cls) n.setAttribute("class", cls); svg.appendChild(n); return n; };
+  const floor = mk("line", "floor");
+  for (const [k, v] of [["x1", 6], ["x2", 194], ["y1", G + 4], ["y2", G + 4]]) floor.setAttribute(k, v);
+  const fig = { svg, legs: [mk("polyline", "far"), mk("polyline")], arms: [mk("polyline", "far"), mk("polyline")], torso: mk("polyline"), head: mk("circle"), weights: [] };
+  fig.head.setAttribute("r", 7);
+  if (weights) for (let i = 0; i < 2; i++) { const r = mk("rect", "weight"); for (const [k, v] of [["width", 12], ["height", 6], ["rx", 2]]) r.setAttribute(k, v); fig.weights.push(r); }
+  return fig;
+}
+function setPose(fig, s) {
+  const pts = a => a.map(p => p[0].toFixed(1) + "," + p[1].toFixed(1)).join(" ");
+  const toe = a => [a[0] + 8, a[1] >= G - 12 ? G : a[1] + 2];
+  fig.torso.setAttribute("points", pts([s.hip, s.sh]));
+  fig.head.setAttribute("cx", s.head[0].toFixed(1)); fig.head.setAttribute("cy", s.head[1].toFixed(1));
+  s.legs.forEach((l, i) => fig.legs[i].setAttribute("points", pts(s.foot ? [s.hip, l.mid, l.end, toe(l.end)] : [s.hip, l.mid, l.end])));
+  s.arms.forEach((a, i) => fig.arms[i].setAttribute("points", pts([s.sh, a.mid, a.end])));
+  fig.weights.forEach((w, i) => { const h = s.arms[i].end; w.setAttribute("x", (h[0] - 6).toFixed(1)); w.setAttribute("y", (h[1] - 3).toFixed(1)); });
+}
+// Loops from the first pose to the second and back.  Returns a function that stops it.
+function playMove(fig, a, b, ms) {
+  let raf = 0, t0 = null;
+  const frame = ts => {
+    if (!fig.svg.isConnected) return;
+    if (t0 === null) t0 = ts;
+    const u = ((ts - t0) % ms) / ms, t = Math.min(1, Math.max(0, 1.25 * ((1 - Math.cos(2 * Math.PI * u)) / 2 - 0.5) + 0.5));
+    setPose(fig, solve(mix(a, b, t)));
+    raf = requestAnimationFrame(frame);
+  };
+  raf = requestAnimationFrame(frame);
+  return () => cancelAnimationFrame(raf);
+}
+const stillMotion = () => window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+// The panel under an exercise:  a looping drawing and one line of coaching.  When the computer asks for
+// reduced motion, the panel shows two still poses first and a button starts the movement on request.
+function animate(panel, before, key, name) {
+  const fig = makeFigure(/dumbbell|kettlebell/i.test(name));
+  before.before(fig.svg);
+  panel._fig = fig;
+  panel._stop = playMove(fig, P[key].a, P[key].b, 2600);
+}
+function openMove(li, key, name) {
+  const panel = li.querySelector(".move");
+  if (panel.dataset.ready !== "1") {
+    const weights = /dumbbell|kettlebell/i.test(name), m = P[key];
+    const cue = el("p", "cue", m.cue);
+    if (stillMotion()) {
+      const row = el("div", "stills");
+      [["Start", m.a], ["End", m.b]].forEach(([label, pose]) => {
+        const fig = makeFigure(weights), box = el("figure");
+        setPose(fig, solve(pose)); box.append(fig.svg, el("figcaption", null, label)); row.appendChild(box);
+      });
+      const play = el("button", "ghost", "Play the movement"); play.type = "button";
+      play.addEventListener("click", () => { row.remove(); play.remove(); animate(panel, cue, key, name); });
+      panel.append(row, play, cue);
+    } else {
+      panel.appendChild(cue);
+      animate(panel, cue, key, name);
+    }
+    panel.append(el("p", "note", "A simple drawing of the general movement.  Go at your own pace and stop if anything hurts."));
+    panel.dataset.ready = "1";
+  }
+  panel.hidden = false;
+  if (panel._fig && !panel._stop) panel._stop = playMove(panel._fig, P[key].a, P[key].b, 2600);
+}
+function closeMove(li) {
+  const panel = li.querySelector(".move");
+  if (panel._stop) { panel._stop(); panel._stop = null; }
+  panel.hidden = true;
+}
+function makeToggle(li, list, key, name) {
+  const panel = el("div", "move"); panel.hidden = true;
+  li.appendChild(panel);
+  li.classList.add("canplay"); li.tabIndex = 0;
+  li.setAttribute("role", "button"); li.setAttribute("aria-expanded", "false");
+  const toggle = () => {
+    const opening = li.getAttribute("aria-expanded") !== "true";
+    list.querySelectorAll("li.canplay").forEach(o => { o.setAttribute("aria-expanded", "false"); closeMove(o); });
+    if (opening) { li.setAttribute("aria-expanded", "true"); openMove(li, key, name); }
+  };
+  li.addEventListener("click", e => { if (!e.target.closest(".move")) toggle(); });
+  li.addEventListener("keydown", e => { if ((e.key === "Enter" || e.key === " ") && e.target === li) { e.preventDefault(); toggle(); } });
+}
+
 function planBubble(reply) {
   const p = reply.plan;
   const b = el("div", "bubble wide");
@@ -139,11 +397,13 @@ function planBubble(reply) {
     p.exercises.forEach((e, i) => {
       const li = el("li");
       li.appendChild(el("span", "num", String(i + 1)));
+      const key = movementFor(e.name);
       const name = el("span", "name", e.name);
-      name.appendChild(el("small", null, e.equipment_text + " · rest " + e.rest_seconds + " s"));
+      name.appendChild(el("small", null, e.equipment_text + " · rest " + e.rest_seconds + " s" + (key ? " · tap to see the move" : "")));
       li.appendChild(name);
       li.appendChild(el("span", "sets", e.sets + " × " + e.reps));
       list.appendChild(li);
+      if (key) makeToggle(li, list, key, e.name);
     });
     b.appendChild(list);
     const total = el("div", "total");
