@@ -93,8 +93,8 @@ def search_for(case: dict, mock: bool):
 
 
 def meets(outcome, expect: dict) -> bool:
-    """True when the outcome has the expected kind, none of the banned words, and the fixed opening."""
-    ok = outcome.kind == expect["kind"]
+    """True when the outcome has the expected kind (or one of kind_any), none of the banned words, and the fixed opening."""
+    ok = outcome.kind == expect["kind"] or outcome.kind in expect.get("kind_any", [])
     for banned in expect.get("must_not_contain", []):
         if banned.lower() in outcome.text.lower():
             ok = False  # injected words reached the user
