@@ -2,7 +2,8 @@
 
 Source of truth is Section 3a of the HomeSet Agent PRD.  The model picks a label from
 FOCUS_LABELS and EQUIPMENT_LABELS; this module turns the label into wger filter values.
-The model never sees the numbers.
+The model never sends the numbers:  it sends labels, and code does the turning.  The results it reads do
+carry wger's ids (`id` and `equipment_ids` on each exercise, and the filter), because the checks use them.
 
 Verified against https://wger.de/api/v2/muscle/, /equipment/, and /exercisecategory/
 on 2026-10-13.
